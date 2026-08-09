@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Zerginox creates dark, sharp web experiences influenced by heavy music, video games, and modern development."
+    />
+    <meta name="theme-color" content="#050403" />
+
+    <title>Zerginox — Web Design &amp; Development</title>
+
+    <link rel="icon" href="assets/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="script.js" defer></script>
+  </head>
+
+  <body>
+    <main class="site-shell">
+      <header class="site-header">
+        <a class="brand" href="#home" aria-label="Zerginox home">
+          <img
+            src="assets/zerginox-official-wordmark.png"
+            alt="Zerginox"
+            width="1281"
+            height="312"
+          />
+        </a>
+
+        <a
+          class="contact-button"
+          href="mailto:zerginox@gmail.com"
+          aria-label="Email Zerginox at zerginox@gmail.com"
+        >
+          <span class="contact-button__label">Contact</span>
+          <span class="contact-button__arrow" aria-hidden="true">↗</span>
+        </a>
+      </header>
+
+      <section class="home-stage" id="home" aria-label="Zerginox home">
+        <aside class="about" aria-labelledby="about-title">
+          <p class="eyebrow">About</p>
+          <h1 id="about-title">Digital work with a darker edge.</h1>
+
+          <div class="about__copy">
+            <p>
+              I’m Zerginox—a University of Arizona graduate with a bachelor’s
+              degree in IT Management, currently pursuing an MSCS through Penn
+              State. I have earned certification in entry-level Python
+              programming and have hands-on development experience with Python,
+              Kotlin, and Java.
+            </p>
+
+            <p>
+              Heavy music and video games are major creative influences on my
+              work. Distant, Lorna Shore, Knocked Loose, DevilDriver, and
+              Malevolence—along with DOOM: The Dark Ages and Elden Ring—help
+              shape the dark, aggressive, and atmospheric aesthetic behind
+              Zerginox.
+            </p>
+
+            <p class="about__availability">
+              I’m currently accepting select web design and development projects
+              at no cost as I continue building my professional portfolio.
+            </p>
+          </div>
+        </aside>
+
+        <div class="showcase" aria-label="Featured Zerginox animation">
+          <div class="lattice-frame">
+            <span class="frame-corner frame-corner--tl" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--tr" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--bl" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--br" aria-hidden="true"></span>
+
+            <div class="video-wrap">
+              <video
+                autoplay
+                muted
+                loop
+                playsinline
+                preload="metadata"
+                poster="assets/zerginox-hero-poster.jpg"
+                aria-label="Animated Zerginox wizard in a fiery wasteland"
+              >
+                <source src="assets/zerginox-hero.mp4" type="video/mp4" />
+                Your browser does not support embedded video.
+              </video>
+            </div>
+          </div>
+
+          <div class="showcase__caption" aria-hidden="true">
+            <span>Original animation</span>
+            <span>00:30</span>
+          </div>
+        </div>
+
+        <aside class="spotify-panel" aria-labelledby="spotify-title">
+          <p class="eyebrow">Listening</p>
+          <h2 id="spotify-title">Spotify playlist</h2>
+
+          <div class="lattice-frame lattice-frame--spotify">
+            <span class="frame-corner frame-corner--tl" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--tr" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--bl" aria-hidden="true"></span>
+            <span class="frame-corner frame-corner--br" aria-hidden="true"></span>
+
+            <div class="spotify-placeholder" id="spotify-slot">
+              <span class="spotify-placeholder__disc" aria-hidden="true"></span>
+              <strong>Playlist embed</strong>
+              <span>Ready for your Spotify link</span>
+            </div>
+          </div>
+
+          <div class="spotify-panel__caption" aria-hidden="true">
+            <span>Curated by Zerginox</span>
+            <span>Spotify</span>
+          </div>
+        </aside>
+      </section>
+
+      <footer class="site-footer">
+        <span>Zerginox</span>
+        <a href="mailto:zerginox@gmail.com">zerginox@gmail.com</a>
+      </footer>
+    </main>
+  </body>
+</html>
