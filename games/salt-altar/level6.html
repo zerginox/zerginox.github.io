@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salt Altar — Level 6 | Zerginox</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #060708;
+      color: #d7e0d2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(95vw, 920px);
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #dbe7d1;
+      text-shadow: 0 0 10px rgba(170, 205, 150, 0.18);
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #aab4a4;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      border: 4px solid #171b17;
+      background: #0a0d0a;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.65);
+    }
+
+    .ui {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 2px solid #2b312b;
+      background: #121612;
+      color: #d7e0d2;
+      padding: 8px 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .legend {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      color: #8f998b;
+    }
+  </style>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="portal.css"><script src="portal.js"></script>
+</head>
+<body class="salt-level">
+<header class="portal-nav"><a class="portal-brand" href="../../">Zerginox</a><span class="portal-level">Salt Altar / Ritual 06</span><nav aria-label="Game navigation"><a href="index.html">← Level select</a><a href="../../#games">All games</a></nav></header>
+  <div class="wrap">
+    <h1>Salt Altar</h1>
+    <p>Level 6 — Complete the four rituals to call forth the offerings while the altar pulse and the Presence close in.</p>
+
+    <div class="ui">
+      <div><strong>Food:</strong> <span id="score">0</span> / <span id="total">0</span></div>
+      <div><strong>Lives:</strong> <span id="lives">3</span></div>
+      <div><strong>Time:</strong> <span id="timer">60.0</span>s</div>
+      <div>
+        <button id="startBtn">Start</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <canvas id="game" width="900" height="520"></canvas>
+<div class="touch-controls" role="group" aria-label="Touch movement controls"><button type="button" data-key="ArrowLeft" aria-label="Move left">←</button><div class="vertical-controls"><button type="button" data-key="ArrowUp" aria-label="Move up">↑</button><button type="button" data-key="ArrowDown" aria-label="Move down">↓</button></div><button type="button" data-key="ArrowRight" aria-label="Move right">→</button></div>
+
+    <p class="legend">Press Start • Arrow keys / WASD • Stand inside each ritual circle to call forth the offerings</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const totalEl = document.getElementById('total');
+    const livesEl = document.getElementById('lives');
+    const timerEl = document.getElementById('timer');
+    const restartBtn = document.getElementById('restartBtn');
+    const startBtn = document.getElementById('startBtn');
+
+    const keys = {};
+
+    const world = {
+      width: canvas.width,
+      height: canvas.height,
+      score: 0,
+      totalFood: 10,
+      lives: 3,
+      timeLimit: 60,
+      timeLeft: 60,
+      lastTime: 0,
+      win: false,
+      lose: false,
+    };
+
+    const slug = {
+      x: 24,
+      y: 244,
+      w: 56,
+      h: 32,
+      speed: 2.7,
+      facing: 1,
+      wiggle: 0,
+      hurtTimer: 0,
+    };
+
+    const centerAltar = {
+      x: 450,
+      y: 260,
+      radius: 56,
+      rotation: 0,
+      spinSpeed: 0.014,
+      pulseTimer: 0,
+      pulseInterval: 5600,
+      ringGapAngle: -Math.PI / 2,
+      ringGapWidth: 1.12,
+      mouthPulse: 0,
+    };
+
+    const pulseRings = [];
+
+    const presenceSpawnPoints = [
+      { x: 450, y: 110 },
+      { x: 450, y: 410 },
+      { x: 320, y: 260 },
+      { x: 580, y: 260 },
+    ];
+
+    const presences = presenceSpawnPoints.map((point, index) => ({
+      x: point.x,
+      y: point.y,
+      homeX: point.x,
+      homeY: point.y,
+      r: 28,
+      speed: 0.62 + index * 0.035,
+      active: false,
+      alpha: 0,
+      bob: index * 0.9,
+      engageTimer: 0,
+    }));
+
+    const rituals = [
+      { x: 150, y: 102, radius: 38, progress: 0, completed: false, spawnIndex: 0 },
+      { x: 750, y: 102, radius: 38, progress: 0, completed: false, spawnIndex: 1 },
+      { x: 150, y: 398, radius: 38, progress: 0, completed: false, spawnIndex: 2 },
+      { x: 750, y: 398, radius: 38, progress: 0, completed: false, spawnIndex: 3 }
+    ];
+
+    const foodSets = [
+      [
+        { x: 330, y: 102, r: 7, taken: false },
+        { x: 384, y: 170, r: 7, taken: false },
+        { x: 308, y: 230, r: 7, taken: false }
+      ],
+      [
+        { x: 570, y: 104, r: 7, taken: false },
+        { x: 516, y: 170, r: 7, taken: false },
+        { x: 590, y: 230, r: 7, taken: false }
+      ],
+      [
+        { x: 306, y: 296, r: 7, taken: false },
+        { x: 382, y: 396, r: 7, taken: false }
+      ],
+      [
+        { x: 592, y: 296, r: 7, taken: false },
+        { x: 518, y: 396, r: 7, taken: false }
+      ]
+    ];
+
+    const pillars = [
+      { x: 240, y: 74,  w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 618, y: 74,  w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 88,  y: 222, w: 42, h: 74, flash: 0, blastRadius: 64 },
+      { x: 770, y: 222, w: 42, h: 74, flash: 0, blastRadius: 64 },
+      { x: 240, y: 348, w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 618, y: 348, w: 42, h: 64, flash: 0, blastRadius: 64 }
+    ];
+
+    let foods = [];
+
+    let gameStarted = false;
+    let countdownActive = false;
+    let countdownValue = 3;
+    let winRedirectStarted = false;
+    let countdownIntervalId = null;
+
+    function clearKeys() {
+      for (const key in keys) delete keys[key];
+    }
+
+    function updateUI() {
+      scoreEl.textContent = world.score;
+      livesEl.textContent = world.lives;
+      timerEl.textContent = world.timeLeft.toFixed(1);
+      totalEl.textContent = world.totalFood;
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function circleRectOverlap(circle, rect) {
+      const closestX = clamp(circle.x, rect.x, rect.x + rect.w);
+      const closestY = clamp(circle.y, rect.y, rect.y + rect.h);
+      const dx = circle.x - closestX;
+      const dy = circle.y - closestY;
+      return (dx * dx + dy * dy) < (circle.r * circle.r);
+    }
+
+    function isSlugInSafeCircle() {
+      const slugCenterX = slug.x + slug.w / 2;
+      const slugCenterY = slug.y + slug.h / 2;
+      return rituals.some(ritual => {
+        const dx = slugCenterX - ritual.x;
+        const dy = slugCenterY - ritual.y;
+        return Math.hypot(dx, dy) <= ritual.radius - 4;
+      });
+    }
+
+    function respawnSlug() {
+      slug.x = 24;
+      slug.y = 244;
+      slug.facing = 1;
+      slug.hurtTimer = 60;
+      clearKeys();
+    }
+
+    function resetCoreState() {
+      slug.x = 24;
+      slug.y = 244;
+      slug.facing = 1;
+      slug.wiggle = 0;
+      slug.hurtTimer = 0;
+
+      centerAltar.rotation = 0;
+      centerAltar.pulseTimer = 0;
+      centerAltar.ringGapAngle = -Math.PI / 2;
+      centerAltar.mouthPulse = 0;
+
+      pulseRings.length = 0;
+
+      for (const presence of presences) {
+        presence.x = presence.homeX;
+        presence.y = presence.homeY;
+        presence.active = false;
+        presence.alpha = 0;
+        presence.bob = 0;
+        presence.engageTimer = 0;
+      }
+
+      foods = [];
+      rituals[0].progress = 0; rituals[0].completed = false;
+      rituals[1].progress = 0; rituals[1].completed = false;
+      rituals[2].progress = 0; rituals[2].completed = false;
+      rituals[3].progress = 0; rituals[3].completed = false;
+
+      world.score = 0;
+      world.totalFood = 10;
+      world.lives = 3;
+      world.timeLeft = world.timeLimit;
+      world.lastTime = performance.now();
+      world.win = false;
+      world.lose = false;
+
+      gameStarted = false;
+      countdownActive = false;
+      countdownValue = 3;
+      winRedirectStarted = false;
+      if (countdownIntervalId !== null) {
+        clearInterval(countdownIntervalId);
+        countdownIntervalId = null;
+      }
+
+      clearKeys();
+      updateUI();
+    }
+
+    function resetGame(showStart = true) {
+      resetCoreState();
+      startBtn.disabled = !showStart;
+    }
+
+    function beginWinReturn() {
+      if (winRedirectStarted) return;
+      winRedirectStarted = true;
+      window.SaltAltarHost.advance(7);
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }
+
+    function beginCountdown() {
+      if (countdownActive || gameStarted) return;
+
+      clearKeys();
+      countdownActive = true;
+      countdownValue = 3;
+      startBtn.disabled = true;
+
+      if (countdownIntervalId !== null) {
+        clearInterval(countdownIntervalId);
+      }
+
+      countdownIntervalId = setInterval(() => {
+        countdownValue -= 1;
+        if (countdownValue <= 0) {
+          clearInterval(countdownIntervalId);
+          countdownIntervalId = null;
+          countdownActive = false;
+          gameStarted = true;
+          world.lastTime = performance.now();
+        }
+      }, 1000);
+    }
+
+    function startFirstRun() {
+      if (countdownActive || gameStarted) return;
+      clearKeys();
+      beginCountdown();
+    }
+
+    function restartAfterFail() {
+      clearKeys();
+      resetGame(false);
+      beginCountdown();
+    }
+
+    function loseLifeAndRespawn() {
+      world.lives -= 1;
+      updateUI();
+      respawnSlug();
+      const completedRituals = rituals.filter(ritual => ritual.completed).length;
+      for (let i = 0; i < presences.length; i++) {
+        const presence = presences[i];
+        presence.active = i < completedRituals && world.score < world.totalFood;
+        if (presence.active) {
+          presence.x = presence.homeX;
+          presence.y = presence.homeY;
+          presence.engageTimer = 500 + i * 120;
+        } else {
+          presence.engageTimer = 0;
+        }
+      }
+      if (world.lives <= 0) {
+        world.lose = true;
+        clearKeys();
+      }
+    }
+
+    function spawnRing() {
+      pulseRings.push({
+        radius: 26,
+        speed: 3.2,
+        width: 18,
+        gapAngle: centerAltar.ringGapAngle,
+        gapWidth: centerAltar.ringGapWidth,
+        hitCooldown: 0,
+      });
+    }
+
+    function spawnFoodsForRitual(index) {
+      const set = foodSets[index];
+      for (const item of set) {
+        foods.push({ x: item.x, y: item.y, r: item.r, taken: false });
+      }
+    }
+
+    function angleDiff(a, b) {
+      let diff = Math.atan2(Math.sin(a - b), Math.cos(a - b));
+      return Math.abs(diff);
+    }
+
+    function update() {
+      if (world.win || world.lose) return;
+      if (!gameStarted) return;
+
+      const now = performance.now();
+      const dt = (now - world.lastTime) / 1000;
+      world.lastTime = now;
+
+      world.timeLeft = Math.max(0, world.timeLeft - dt);
+      timerEl.textContent = world.timeLeft.toFixed(1);
+
+      if (world.timeLeft <= 0) {
+        world.lose = true;
+        clearKeys();
+        return;
+      }
+
+      let speed = slug.speed;
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['arrowleft'] || keys['a']) {
+        dx -= speed;
+        slug.facing = -1;
+      }
+      if (keys['arrowright'] || keys['d']) {
+        dx += speed;
+        slug.facing = 1;
+      }
+      if (keys['arrowup'] || keys['w']) dy -= speed;
+      if (keys['arrowdown'] || keys['s']) dy += speed;
+
+      slug.x = clamp(slug.x + dx, 0, world.width - slug.w);
+      slug.y = clamp(slug.y + dy, 0, world.height - slug.h);
+      slug.wiggle += 0.18;
+      if (slug.hurtTimer > 0) slug.hurtTimer--;
+
+      const slugBodyHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 5,
+        w: slug.w - 12,
+        h: slug.h - 8,
+      };
+      if (slug.hurtTimer <= 0) {
+        for (const pillar of pillars) {
+          const pillarHitbox = { x: pillar.x, y: pillar.y, w: pillar.w, h: pillar.h };
+          if (rectsOverlap(slugBodyHitbox, pillarHitbox)) {
+            loseLifeAndRespawn();
+            return;
+          }
+        }
+      }
+
+      centerAltar.rotation += centerAltar.spinSpeed;
+      centerAltar.mouthPulse += dt * 4.8;
+      centerAltar.pulseTimer += dt * 1000;
+      if (centerAltar.pulseTimer >= centerAltar.pulseInterval) {
+        centerAltar.pulseTimer = 0;
+        centerAltar.ringGapAngle += Math.PI * 0.55;
+        spawnRing();
+      }
+
+      for (let i = pulseRings.length - 1; i >= 0; i--) {
+        const ring = pulseRings[i];
+        ring.radius += ring.speed;
+        if (ring.hitCooldown > 0) ring.hitCooldown--;
+
+        const slugCenterX = slug.x + slug.w / 2;
+        const slugCenterY = slug.y + slug.h / 2;
+        const dxRing = slugCenterX - centerAltar.x;
+        const dyRing = slugCenterY - centerAltar.y;
+        const dist = Math.hypot(dxRing, dyRing);
+        const angle = Math.atan2(dyRing, dxRing);
+        const inBand = Math.abs(dist - ring.radius) <= ring.width * 0.55;
+        const inGap = angleDiff(angle, ring.gapAngle) <= ring.gapWidth / 2 + 0.18;
+        const inRitualSafeZone = rituals.some(ritual => {
+          const dxSafe = slugCenterX - ritual.x;
+          const dySafe = slugCenterY - ritual.y;
+          return Math.hypot(dxSafe, dySafe) <= ritual.radius - 4;
+        });
+
+        if (slug.hurtTimer <= 0 && ring.hitCooldown <= 0 && inBand && !inGap && !inRitualSafeZone) {
+          ring.hitCooldown = 18;
+          loseLifeAndRespawn();
+          break;
+        }
+
+        if (ring.radius > 640) pulseRings.splice(i, 1);
+      }
+
+      let activeRitual = null;
+      const slugCenter = { x: slug.x + slug.w / 2, y: slug.y + slug.h / 2 };
+      for (const ritual of rituals) {
+        if (ritual.completed) continue;
+        const dist = Math.hypot(slugCenter.x - ritual.x, slugCenter.y - ritual.y);
+        if (dist <= ritual.radius - 4) {
+          activeRitual = ritual;
+          ritual.progress = Math.min(100, ritual.progress + dt * 64);
+          if (ritual.progress >= 100) {
+            ritual.completed = true;
+            ritual.progress = 100;
+            spawnFoodsForRitual(ritual.spawnIndex);
+          }
+        } else {
+          ritual.progress = Math.max(0, ritual.progress - dt * 18);
+        }
+      }
+
+      const completedRituals = rituals.filter(ritual => ritual.completed).length;
+      const inSafeCircle = isSlugInSafeCircle();
+      const targetX = slug.x + slug.w / 2;
+      const targetY = slug.y + slug.h / 2;
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8,
+      };
+
+      for (let i = 0; i < presences.length; i++) {
+        const presence = presences[i];
+        const shouldBeActive = i < completedRituals && world.score < world.totalFood;
+        const wasPresenceActive = presence.active;
+        presence.active = shouldBeActive;
+
+        if (presence.active) {
+          if (!wasPresenceActive) {
+            presence.x = presence.homeX;
+            presence.y = presence.homeY;
+            presence.engageTimer = 500 + i * 120;
+          }
+
+          if (presence.engageTimer > 0) {
+            presence.engageTimer -= dt * 1000;
+          } else if (!inSafeCircle) {
+            const pdx = targetX - presence.x;
+            const pdy = targetY - presence.y;
+            const pdist = Math.hypot(pdx, pdy) || 1;
+            presence.x += (pdx / pdist) * presence.speed;
+            presence.y += (pdy / pdist) * presence.speed;
+          }
+          presence.alpha = Math.min(0.86, presence.alpha + 0.018);
+        } else {
+          presence.engageTimer = 0;
+          presence.alpha = Math.max(0, presence.alpha - 0.03);
+        }
+        presence.bob += 0.08;
+
+        if (presence.alpha > 0.01 && slug.hurtTimer <= 0 && !inSafeCircle) {
+          const presenceHit = {
+            x: presence.x - presence.r,
+            y: presence.y - presence.r,
+            w: presence.r * 2,
+            h: presence.r * 2
+          };
+          const overlap = !(presenceHit.x > slugHitbox.x + slugHitbox.w ||
+                            presenceHit.x + presenceHit.w < slugHitbox.x ||
+                            presenceHit.y > slugHitbox.y + slugHitbox.h ||
+                            presenceHit.y + presenceHit.h < slugHitbox.y);
+          if (overlap) {
+            loseLifeAndRespawn();
+            return;
+          }
+        }
+      }
+
+      const pickupZones = [
+        {
+          x: slug.x + slug.w / 2,
+          y: slug.y + slug.h / 2 + Math.sin(slug.wiggle) * 1,
+          r: 15,
+        },
+        {
+          x: slug.facing === -1 ? slug.x + 10 : slug.x + slug.w - 10,
+          y: slug.y + slug.h / 2 + Math.sin(slug.wiggle) * 1,
+          r: 12,
+        }
+      ];
+
+      for (const food of foods) {
+        if (food.taken) continue;
+        const foodRect = { x: food.x - food.r, y: food.y - food.r, w: food.r * 2, h: food.r * 2 };
+        const collected = pickupZones.some(zone => circleRectOverlap(zone, foodRect));
+        if (collected) {
+          food.taken = true;
+          world.score += 1;
+          updateUI();
+        }
+      }
+
+      if (!world.win && world.score >= world.totalFood) {
+        world.win = true;
+        clearKeys();
+        beginWinReturn();
+      }
+    }
+
+    function drawBackground() {
+      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bg.addColorStop(0, '#050605');
+      bg.addColorStop(1, '#111612');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 42; i++) {
+        const x = (i * 97) % canvas.width;
+        const y = (i * 61) % canvas.height;
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(180, 220, 170, 0.035)' : 'rgba(255,255,255,0.02)';
+        ctx.beginPath();
+        ctx.arc(x, y, 1 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(70, 95, 70, 0.18)';
+      ctx.lineWidth = 2;
+      for (let x = 80; x < canvas.width; x += 170) {
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height);
+        ctx.quadraticCurveTo(x - 18, canvas.height - 100, x + 12, canvas.height - 190);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#151914';
+      ctx.fillRect(0, 468, canvas.width, 52);
+    }
+
+    function drawFood(food, now) {
+      if (food.taken) return;
+      const pulse = 1 + Math.sin(now / 180 + food.x * 0.01) * 0.12;
+      ctx.save();
+      ctx.translate(food.x, food.y);
+      ctx.scale(pulse, pulse);
+      ctx.fillStyle = '#f7fff5';
+      ctx.beginPath();
+      ctx.arc(0, 0, food.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(-2, -2, food.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPillar(pillar, now) {
+      const x = pillar.x;
+      const y = pillar.y;
+      const w = pillar.w;
+      const h = pillar.h;
+
+      const glow = ctx.createRadialGradient(
+        x + w / 2, y + h / 2, 6,
+        x + w / 2, y + h / 2, Math.max(w, h) * 0.9
+      );
+      glow.addColorStop(0, 'rgba(200,245,230,0.10)');
+      glow.addColorStop(1, 'rgba(200,245,230,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 16, y - 16, w + 32, h + 32);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.48, y + h + 8, w * 0.50, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const base = 'rgba(235,255,248,0.88)';
+      const tint = 'rgba(175,225,210,0.55)';
+
+      const shards = [
+        { cx: x + w * 0.24, cy: y + h * 0.64, sw: w * 0.54, sh: h * 0.76 },
+        { cx: x + w * 0.54, cy: y + h * 0.50, sw: w * 0.62, sh: h * 1.00 },
+        { cx: x + w * 0.78, cy: y + h * 0.64, sw: w * 0.42, sh: h * 0.70 }
+      ];
+
+      for (const shard of shards) {
+        const sx = shard.cx;
+        const sy = shard.cy;
+        const sw = shard.sw;
+        const sh = shard.sh;
+
+        const poly = [
+          { x: sx - sw * 0.45, y: sy + sh * 0.25 },
+          { x: sx - sw * 0.10, y: sy - sh * 0.48 },
+          { x: sx + sw * 0.22, y: sy - sh * 0.42 },
+          { x: sx + sw * 0.42, y: sy - sh * 0.05 },
+          { x: sx + sw * 0.30, y: sy + sh * 0.50 },
+          { x: sx - sw * 0.20, y: sy + sh * 0.56 }
+        ];
+
+        ctx.fillStyle = base;
+        ctx.strokeStyle = '#0f1912';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = tint;
+        ctx.beginPath();
+        ctx.moveTo(poly[1].x, poly[1].y);
+        ctx.lineTo(poly[2].x, poly[2].y);
+        ctx.lineTo(poly[3].x, poly[3].y);
+        ctx.lineTo(sx + sw * 0.05, sy + sh * 0.12);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawCenterAltar(now) {
+      ctx.save();
+      ctx.translate(centerAltar.x, centerAltar.y);
+      ctx.rotate(centerAltar.rotation);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.50)';
+      ctx.beginPath();
+      ctx.ellipse(0, 14, centerAltar.radius, centerAltar.radius * 0.54, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const outer = [
+        { x: -14, y: -57 }, { x: 5, y: -60 }, { x: 24, y: -53 }, { x: 41, y: -40 },
+        { x: 55, y: -16 }, { x: 58, y: 6 }, { x: 45, y: 29 }, { x: 26, y: 47 },
+        { x: 3, y: 59 }, { x: -19, y: 54 }, { x: -39, y: 43 }, { x: -54, y: 22 },
+        { x: -60, y: 0 }, { x: -50, y: -24 }, { x: -33, y: -45 }
+      ];
+
+      ctx.beginPath();
+      ctx.moveTo(outer[0].x, outer[0].y);
+      for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(224,242,232,0.84)';
+      ctx.strokeStyle = '#0f1912';
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+
+      const bloodDisc = [
+        { x: -6, y: -27 }, { x: 11, y: -24 }, { x: 23, y: -12 }, { x: 20, y: 6 },
+        { x: 8, y: 20 }, { x: -10, y: 23 }, { x: -23, y: 11 }, { x: -20, y: -8 }
+      ];
+      ctx.beginPath();
+      ctx.moveTo(bloodDisc[0].x, bloodDisc[0].y);
+      for (let i = 1; i < bloodDisc.length; i++) ctx.lineTo(bloodDisc[i].x, bloodDisc[i].y);
+      ctx.closePath();
+      ctx.fillStyle = '#4a1218';
+      ctx.strokeStyle = '#22070b';
+      ctx.lineWidth = 2.5;
+      ctx.fill();
+      ctx.stroke();
+
+      const darkCore = [
+        { x: -3, y: -11 }, { x: 6, y: -9 }, { x: 11, y: -1 }, { x: 8, y: 8 },
+        { x: 0, y: 12 }, { x: -9, y: 7 }, { x: -12, y: -2 }, { x: -8, y: -9 }
+      ];
+      ctx.beginPath();
+      ctx.moveTo(darkCore[0].x, darkCore[0].y);
+      for (let i = 1; i < darkCore.length; i++) ctx.lineTo(darkCore[i].x, darkCore[i].y);
+      ctx.closePath();
+      ctx.fillStyle = '#2a090d';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#d9d1c2';
+      ctx.fill();
+      ctx.strokeStyle = '#120d0c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#17080b';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(-2, -2, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(26,5,8,0.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-17, -6); ctx.lineTo(-4, -2); ctx.lineTo(-14, 11);
+      ctx.moveTo(15, -14); ctx.lineTo(4, -4); ctx.lineTo(12, 11);
+      ctx.moveTo(-1, -18); ctx.lineTo(1, -7); ctx.lineTo(7, 6);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawRitual(ritual, now) {
+      const pulse = 1 + Math.sin(now / 210 + ritual.x * 0.01) * 0.06;
+      ctx.save();
+      ctx.translate(ritual.x, ritual.y);
+      ctx.scale(pulse, pulse);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ritual.radius + 10, 0, Math.PI * 2);
+      ctx.fillStyle = ritual.completed ? 'rgba(175, 225, 210, 0.08)' : 'rgba(90, 22, 30, 0.13)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ritual.radius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(16, 10, 12, 0.86)';
+      ctx.fill();
+      ctx.strokeStyle = ritual.completed ? '#b7e6d8' : '#bbaea1';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ritual.radius - 11, 0, Math.PI * 2);
+      ctx.strokeStyle = ritual.completed ? 'rgba(190,255,236,0.70)' : 'rgba(120, 46, 54, 0.65)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = ritual.completed ? '#dff7f0' : '#5e1b24';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-16, 0); ctx.lineTo(16, 0);
+      ctx.moveTo(0, -16); ctx.lineTo(0, 16);
+      ctx.moveTo(-11, -11); ctx.lineTo(11, 11);
+      ctx.moveTo(11, -11); ctx.lineTo(-11, 11);
+      ctx.stroke();
+
+      if (!ritual.completed && ritual.progress > 0) {
+        ctx.beginPath();
+        ctx.arc(0, 0, ritual.radius + 5, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2) * (ritual.progress / 100));
+        ctx.strokeStyle = '#e9f7df';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawPulseRings() {
+      for (const ring of pulseRings) {
+        ctx.save();
+        ctx.translate(centerAltar.x, centerAltar.y);
+        ctx.strokeStyle = 'rgba(228, 240, 232, 0.52)';
+        ctx.lineWidth = ring.width;
+        ctx.beginPath();
+        ctx.arc(0, 0, ring.radius, ring.gapAngle + ring.gapWidth / 2, ring.gapAngle - ring.gapWidth / 2 + Math.PI * 2, false);
+        ctx.stroke();
+
+        ctx.strokeStyle = 'rgba(122, 24, 34, 0.44)';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, ring.radius, ring.gapAngle + ring.gapWidth / 2, ring.gapAngle - ring.gapWidth / 2 + Math.PI * 2, false);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawPresence(presence, now) {
+      if (presence.alpha <= 0.01) return;
+      const bob = Math.sin(presence.bob) * 4;
+      const wingFlap = Math.sin(now * 0.014) * 5;
+      ctx.save();
+      ctx.globalAlpha = presence.alpha;
+      ctx.translate(presence.x, presence.y + bob);
+
+      const glow = ctx.createRadialGradient(0, 0, 6, 0, 0, 60);
+      glow.addColorStop(0, 'rgba(156,184,96,0.18)');
+      glow.addColorStop(1, 'rgba(156,184,96,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, 60, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.scale(side, 1);
+
+        ctx.fillStyle = '#394426';
+        ctx.beginPath();
+        ctx.moveTo(16, -2);
+        ctx.quadraticCurveTo(34, -28 - wingFlap, 54, -20);
+        ctx.quadraticCurveTo(66, -12, 58, 2);
+        ctx.quadraticCurveTo(50, 16, 34, 18);
+        ctx.quadraticCurveTo(23, 14, 16, -2);
+        ctx.fill();
+
+        ctx.fillStyle = '#56683a';
+        ctx.beginPath();
+        ctx.moveTo(12, 2);
+        ctx.quadraticCurveTo(30, 28 + wingFlap * 0.6, 50, 26);
+        ctx.quadraticCurveTo(60, 22, 54, 8);
+        ctx.quadraticCurveTo(46, -4, 26, -2);
+        ctx.quadraticCurveTo(16, -1, 12, 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#1b2211';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(14, 0);
+        ctx.quadraticCurveTo(30, -10, 53, -12);
+        ctx.moveTo(16, 5);
+        ctx.quadraticCurveTo(31, 8, 50, 16);
+        ctx.stroke();
+
+        ctx.restore();
+      }
+
+      const bodyGrad = ctx.createRadialGradient(-4, -8, 6, 0, 0, 34);
+      bodyGrad.addColorStop(0, '#a9ba72');
+      bodyGrad.addColorStop(0.45, '#748a45');
+      bodyGrad.addColorStop(1, '#445228');
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 30, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#1b2211';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const holes = [
+        { x: -13, y: -12, r: 6.8 },
+        { x: -2, y: -15, r: 5.2 },
+        { x: 10, y: -11, r: 6.4 },
+        { x: 16, y: -1, r: 4.8 },
+        { x: -17, y: -1, r: 5.8 },
+        { x: -7, y: 1, r: 7.4 },
+        { x: 5, y: 2, r: 6.0 },
+        { x: 16, y: 8, r: 6.2 },
+        { x: -11, y: 13, r: 7.1 },
+        { x: 1, y: 12, r: 5.0 },
+        { x: 12, y: 16, r: 6.0 },
+        { x: -1, y: 22, r: 4.6 }
+      ];
+
+      for (const hole of holes) {
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, hole.r + 1.8, 0, Math.PI * 2);
+        ctx.fillStyle = '#2c3419';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(hole.x, hole.y, hole.r, 0, Math.PI * 2);
+        ctx.fillStyle = '#a3c95a';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(hole.x - hole.r * 0.15, hole.y - hole.r * 0.15, hole.r * 0.36, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(229,247,182,0.35)';
+        ctx.fill();
+      }
+
+      ctx.fillStyle = '#232c15';
+      ctx.beginPath();
+      ctx.arc(-7, -2, 2.2, 0, Math.PI * 2);
+      ctx.arc(7, -2, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(-10, 12);
+      ctx.quadraticCurveTo(0, 18 + Math.sin(now * 0.02) * 2, 10, 12);
+      ctx.quadraticCurveTo(0, 26, -10, 12);
+      ctx.fillStyle = '#1a1f10';
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    function drawSlugBody(baseA, baseB, hurtFlash) {
+      const bodyGrad = ctx.createLinearGradient(0, 0, slug.w, slug.h);
+      bodyGrad.addColorStop(0, hurtFlash ? '#6f7b58' : baseA);
+      bodyGrad.addColorStop(1, hurtFlash ? '#303926' : baseB);
+      ctx.fillStyle = bodyGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(5, slug.h - 1);
+      ctx.quadraticCurveTo(10, 4, 28, 5);
+      ctx.quadraticCurveTo(44, 5, 55, 16);
+      ctx.quadraticCurveTo(61, 22, 56, 28);
+      ctx.quadraticCurveTo(51, 31, 36, 30);
+      ctx.lineTo(10, 30);
+      ctx.quadraticCurveTo(2, 29, 5, slug.h - 1);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(16, 11);
+      ctx.lineTo(15, -5);
+      ctx.moveTo(28, 10);
+      ctx.lineTo(31, -7);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e9f7df';
+      ctx.beginPath();
+      ctx.arc(15, -5, 3.5, 0, Math.PI * 2);
+      ctx.arc(31, -7, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0a0d08';
+      ctx.beginPath();
+      ctx.arc(15, -5, 1.8, 0, Math.PI * 2);
+      ctx.arc(31, -7, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(20, 15, 1.7, 0, Math.PI * 2);
+      ctx.arc(31, 14, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#10150c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(37, 19);
+      ctx.quadraticCurveTo(44, 22, 37, 25);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#a9c56d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(12, 24);
+      ctx.quadraticCurveTo(18, 20, 24, 24);
+      ctx.quadraticCurveTo(30, 28, 36, 24);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(210, 255, 210, 0.08)';
+      ctx.beginPath();
+      ctx.ellipse(22, 12, 10, 4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDefaultSlug() {
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+      drawSlugBody('#6e7f56', '#2b3323', isHurtFlash);
+    }
+
+    function drawSlug() {
+      const bob = Math.sin(slug.wiggle) * 2;
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+
+      ctx.save();
+      ctx.translate(slug.x + slug.w / 2, slug.y + slug.h / 2 + bob);
+      if (slug.facing === -1) ctx.scale(-1, 1);
+      ctx.translate(-slug.w / 2, -slug.h / 2);
+      if (isHurtFlash) ctx.globalAlpha = 0.65;
+      drawDefaultSlug();
+      ctx.restore();
+    }
+
+    function drawStatusText() {
+      const remaining = rituals.filter(r => !r.completed).length;
+      ctx.fillStyle = '#aab4a4';
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText(`Rituals Remaining: ${remaining}`, 16, 26);
+
+      const active = rituals.find(r => !r.completed && r.progress > 0 && r.progress < 100);
+      if (active) {
+        ctx.fillStyle = '#d7e0d2';
+        ctx.fillText(`Channeling: ${Math.ceil(active.progress)}%`, 16, 48);
+      }
+    }
+
+    function drawMessage() {
+      if (!world.win && !world.lose && !countdownActive && gameStarted) return;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+
+      if (countdownActive) {
+        ctx.font = 'bold 80px Arial';
+        ctx.fillText(String(countdownValue), canvas.width / 2, canvas.height / 2);
+      } else if (!gameStarted) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Press Start', canvas.width / 2, canvas.height / 2);
+      } else if (world.win) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Offering Accepted!', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Returning to altar...', canvas.width / 2, canvas.height / 2 + 35);
+      } else if (world.lose) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('The ritual failed.', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Press Restart to play again', canvas.width / 2, canvas.height / 2 + 35);
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    function draw() {
+      const now = performance.now();
+      drawBackground();
+      for (const pillar of pillars) drawPillar(pillar, now);
+      for (const ritual of rituals) drawRitual(ritual, now);
+      drawPulseRings();
+      drawCenterAltar(now);
+      for (const food of foods) drawFood(food, now);
+      for (const presence of presences) drawPresence(presence, now);
+      drawSlug();
+      drawStatusText();
+      drawMessage();
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = false;
+      }
+    });
+
+    window.addEventListener('blur', clearKeys);
+
+    startBtn.addEventListener('click', startFirstRun);
+    restartBtn.addEventListener('click', restartAfterFail);
+
+    resetGame(true);
+    loop();
+  </script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+  <meta name="theme-color" content="#071a22">
+  <title>Play Monster Fish | Zerginox</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<a class="zerginox-return" href="../../../" target="_top" aria-label="Back to Zerginox">← ZERGINOX</a>
+<main id="game" aria-label="Monster Fish fishing game">
+  <canvas id="lake" aria-label="Fishing rod and Blackwater Lake. Flick upward to cast, then tap when a fish bites."></canvas>
+  <header class="topbar">
+    <div class="brand"><div class="eyebrow">SOMETHING LURKS BELOW</div><h1>MONSTER<span>FISH<span class="title-dot">.</span></span></h1></div>
+    <div class="top-actions">
+      <button id="journalButton" class="journal-button" aria-label="Open catch journal"><span class="book-icon" aria-hidden="true">▥</span><span>JOURNAL <b id="journalCount">0/25</b></span></button>
+      <button id="helpButton" class="help-button" aria-label="How to play">?</button>
+    </div>
+  </header>
+  <section class="lake-label" aria-label="Lake and real local time">
+    <div class="location"><span class="location-dot"></span> BLACKWATER LAKE</div>
+    <div class="clock"><time id="clock">00:00:00</time><span id="dayPhase">LOCAL TIME</span></div>
+  </section>
+  <section class="condition" id="condition" aria-live="polite"><span class="condition-dot"></span><div><span id="eventName">Calm waters</span><small id="eventNote">The lake is keeping its secrets.</small></div><time id="eventTimer"></time></section>
+  <div id="biteCallout" class="bite-callout" hidden>YOU'VE GOT A BITE<span>TAP TO REEL IT IN</span></div>
+  <div id="castMeter" class="cast-meter" hidden><span>CAST POWER</span><div><i></i></div></div>
+  <footer class="hud">
+    <div class="hud-status"><span id="statusKicker">YOUR NEXT STORY IS OUT THERE</span><h2 id="statusTitle">Flick up to cast.</h2><p id="statusNote">Wait for a bite. Tap to reel. Meet the locals.</p></div>
+    <div class="hud-controls">
+      <button id="baitButton" class="bait-button"><canvas id="baitIcon" width="104" height="90" aria-hidden="true"></canvas><span><small>BAIT</small><b id="baitName">Earthworm</b></span><span class="chevron">⌃</span></button>
+      <button id="castButton" class="cast-button">CAST LINE <span>↗</span></button>
+    </div>
+    <div class="bottom-line"><span><i></i> <span id="eligibleCount">7 species lurking</span></span><span id="totalCount">0 catches</span></div>
+  </footer>
+  <div id="toast" role="status"></div>
+</main>
+
+<dialog id="journalDialog" class="sheet journal-sheet">
+  <div class="sheet-head"><div><div class="eyebrow">THE BLACKWATER FIELD GUIDE</div><h2>Your strange collection<span>.</span></h2></div><button class="close" data-close aria-label="Close journal">×</button></div>
+  <div class="journal-summary"><b id="collectionSummary">0 of 25 discovered</b><span id="recordSummary">Every monster has a story.</span></div>
+  <div class="progress-track"><i id="collectionProgress"></i></div>
+  <div class="filter-row" id="filters"><button class="active" data-filter="all">All fish</button><button data-filter="caught">Discovered</button><button data-filter="now">Catchable now</button></div>
+  <div class="scroll-area" id="fishGrid"></div>
+</dialog>
+
+<dialog id="baitDialog" class="sheet bait-sheet">
+  <div class="sheet-head"><div><div class="eyebrow">WHAT ARE THEY BITING?</div><h2>Pick your bait<span>.</span></h2></div><button class="close" data-close aria-label="Close bait selector">×</button></div>
+  <p class="sheet-intro">Some monsters are picky. The right bait opens up new possibilities. All bait is unlimited.</p>
+  <div class="scroll-area bait-grid" id="baitGrid"></div>
+</dialog>
+
+<dialog id="detailDialog" class="sheet detail-sheet">
+  <button class="close float-close" data-close aria-label="Close fish details">×</button>
+  <canvas id="detailArt" width="720" height="450" aria-label="Fish illustration"></canvas>
+  <div id="detailContent"></div>
+</dialog>
+
+<dialog id="catchDialog" class="sheet catch-sheet">
+  <div class="catch-kicker" id="catchKicker">A NEW FACE FROM THE DEEP</div>
+  <canvas id="catchArt" width="800" height="530" aria-label="Your caught monster fish"></canvas>
+  <div class="rarity" id="catchRarity">COMMON</div><h2 id="catchName">Bogling</h2>
+  <p id="catchLore"></p>
+  <div class="catch-stats"><div><b id="catchLength"></b><small>LENGTH</small></div><div><b id="catchMass"></b><small>WEIGHT</small></div><div><b id="catchRecord"></b><small>CAUGHT</small></div></div>
+  <p id="catchContext" class="catch-context"></p><button id="keepFishing" class="primary">BACK TO THE LAKE <span>↗</span></button>
+  <small class="saved-note" id="savedNote">Saved to your journal automatically.</small>
+</dialog>
+
+<dialog id="helpDialog" class="sheet help-sheet">
+  <div class="sheet-head"><div><div class="eyebrow">WELCOME TO BLACKWATER</div><h2>Just one more cast<span>.</span></h2></div><button class="close" data-close aria-label="Close instructions">×</button></div>
+  <div class="scroll-area help-body"><p>This lake has 25 unusual residents. A few are easy to meet. Some would rather remain a rumor.</p>
+  <ol><li><b>Choose your bait.</b> Tap the bait box. Certain fish will only bite on a specific bait.</li><li><b>Flick upward.</b> Swipe up over the lake or rod to cast. A stronger flick sends your line farther. You can also use Cast Line.</li><li><b>Watch the bobber.</b> After a few seconds it will dip. Tap the lake or Reel It In before the fish escapes.</li><li><b>Fill your journal.</b> Catches and size records are saved on this device. Inspect the journal for bait, times, and lake conditions.</li></ol>
+  <div class="help-note"><b>The lake keeps real time.</b><p>The clock follows your device's local time. Night is 19:00–06:00. Noon Mirage appears only from 12:00 to 12:05; Witchlight from 03:03 to 03:08. A time and an event listed together must both be active.</p></div>
+  <div class="help-note"><b>The water changes.</b><p>Toxic spills, gasoline fires, storms, and algae blooms happen randomly, last a few minutes, and can bring different fish. Reopening the app does not reroll an event.</p></div>
+  <p class="fine-print">No bait purchases. No waiting energy. Just a rod, a strange lake, and whatever is down there. Sound is off until you turn it on.</p>
+  <button id="soundButton" class="secondary">SOUND: OFF</button>
+  <p class="fine-print">Monster Fish · First playable build 0.1.0<br>Progress is local. Clearing app data or uninstalling can remove your journal.</p>
+  </div>
+</dialog>
+
+<script src="catalog/rarities.js"></script><script src="catalog/lake-events.js"></script><script src="catalog/bait.js"></script><script src="catalog/fish.js"></script><script src="core.js"></script><script src="art.js"></script><script src="scene.js"></script><script src="app.js"></script>
+</body>
+</html>

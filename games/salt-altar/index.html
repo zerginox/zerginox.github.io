@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b100b"><meta name="description" content="Salt Altar returns. Guide a strange little slug through six playable rituals, gathering offerings and avoiding the salt. A browser game by Zerginox.">
+  <title>Salt Altar — Play at Zerginox</title>
+  <link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="portal.css"><script src="portal.js"></script><script src="script.js" defer></script>
+</head>
+<body class="salt-menu">
+  <header class="portal-nav"><a class="portal-brand" href="../../">Zerginox</a><nav aria-label="Game navigation"><a href="../../#games">All games</a><a href="../monster-fish/">Monster Fish ↗</a><button id="soundToggle" class="player-sound" type="button" aria-pressed="false">SOUND OFF</button></nav></header>
+  <audio id="themeMusic" loop preload="none"><source src="Salt_Altar_Theme.mp3" type="audio/mpeg"></audio>
+  <main class="page-shell">
+    <header class="site-header"><h1 class="sr-only">Salt Altar</h1><img src="logo.png" alt="A grinning green slug above the Salt Altar" class="header-logo" width="1536" height="1024"><p class="tagline">Thirteen offerings. One altar.</p></header>
+    <section class="altar-panel" aria-labelledby="offering-title"><h2 class="panel-title" id="offering-title">Choose your offering.</h2><p class="panel-subtitle">Complete each ritual to unlock the next.<br>Six rituals are playable. The rest are still taking shape.</p>
+      <div class="menu-summary"><span><b id="progressSummary">0 of 6 rituals completed</b></span><span>PROGRESS SAVES IN THIS BROWSER</span></div>
+      <div class="level-grid" id="levelGrid" aria-label="Choose a level"></div>
+      <p class="menu-instructions">Move with <b>WASD</b> or the <b>arrow keys</b>. Touch controls are available on smaller screens.<br>Collect the green offerings. Avoid the salt. Watch the clock.</p>
+    </section>
+    <p class="menu-instructions"><a href="../../">← Back to Zerginox</a> &nbsp; / &nbsp; <a href="../monster-fish/">Something else is lurking in Blackwater Lake ↗</a></p>
+  </main>
+</body>
+</html>

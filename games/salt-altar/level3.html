@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salt Altar — Level 3 | Zerginox</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #060708;
+      color: #d7e0d2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(95vw, 920px);
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #dbe7d1;
+      text-shadow: 0 0 10px rgba(170, 205, 150, 0.18);
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #aab4a4;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      border: 4px solid #171b17;
+      background: #0a0d0a;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.65);
+    }
+
+    .ui {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 2px solid #2b312b;
+      background: #121612;
+      color: #d7e0d2;
+      padding: 8px 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .legend {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      color: #8f998b;
+    }
+  </style>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="portal.css"><script src="portal.js"></script>
+</head>
+<body class="salt-level">
+<header class="portal-nav"><a class="portal-brand" href="../../">Zerginox</a><span class="portal-level">Salt Altar / Ritual 03</span><nav aria-label="Game navigation"><a href="index.html">← Level select</a><a href="../../#games">All games</a></nav></header>
+  <div class="wrap">
+    <h1>Salt Altar</h1>
+    <p>Level 3 — Gather the green offerings while the watcher patrols the altar.</p>
+
+    <div class="ui">
+      <div><strong>Food:</strong> <span id="score">0</span> / <span id="total">0</span></div>
+      <div><strong>Lives:</strong> <span id="lives">3</span></div>
+      <div><strong>Time:</strong> <span id="timer">30.0</span>s</div>
+      <div>
+        <button id="startBtn">Start</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <canvas id="game" width="900" height="520"></canvas>
+<div class="touch-controls" role="group" aria-label="Touch movement controls"><button type="button" data-key="ArrowLeft" aria-label="Move left">←</button><div class="vertical-controls"><button type="button" data-key="ArrowUp" aria-label="Move up">↑</button><button type="button" data-key="ArrowDown" aria-label="Move down">↓</button></div><button type="button" data-key="ArrowRight" aria-label="Move right">→</button></div>
+
+    <p class="legend">Press Start • Countdown begins • Then move with Arrow keys, WASD, or the touch controls</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const totalEl = document.getElementById('total');
+    const livesEl = document.getElementById('lives');
+    const timerEl = document.getElementById('timer');
+    const restartBtn = document.getElementById('restartBtn');
+    const startBtn = document.getElementById('startBtn');
+
+    const keys = {};
+    const levelMusic = new Audio("Level_3.mp3");
+
+    const world = {
+      width: canvas.width,
+      height: canvas.height,
+      score: 0,
+      totalFood: 0,
+      lives: 3,
+      timeLimit: 30,
+      timeLeft: 30,
+      lastTime: 0,
+      win: false,
+      lose: false,
+    };
+
+    const slug = {
+      x: 70,
+      y: 260,
+      w: 56,
+      h: 32,
+      speed: 2.6,
+      facing: -1,
+      wiggle: 0,
+      hurtTimer: 0,
+    };
+
+    const enemy = {
+      x: 450,
+      y: 260,
+      w: 86,
+      h: 86,
+      vx: 0,
+      vy: -2.9,
+      speed: 2.9,
+      state: 'move',
+      stateTimer: 0,
+      moveDuration: 2800,
+      pauseDuration: 600,
+      teleportDuration: 600,
+      directionIndex: 0,
+      directions: [
+        { x: 0, y: -1 },
+        { x: 1, y: 0 },
+        { x: 0, y: 1 },
+        { x: -1, y: 0 }
+      ],
+      wiggle: 0,
+      hitFlash: 0,
+      visible: true,
+      alpha: 1,
+      lastSafeX: 450,
+      lastSafeY: 260,
+    };
+
+    const camperWatch = {
+      anchorX: slug.x,
+      anchorY: slug.y,
+      dwellStart: 0,
+      threshold: 800,
+      radius: 42,
+      active: false,
+    };
+
+    const saltBlocks = [
+      { x: 378, y: 24,  w: 116, h: 46 },
+      { x: 612, y: 94,  w: 56,  h: 62 },
+      { x: 730, y: 204, w: 42,  h: 108 },
+      { x: 612, y: 382, w: 64,  h: 66 },
+      { x: 382, y: 458, w: 112, h: 40 },
+      { x: 224, y: 382, w: 64,  h: 66 },
+      { x: 128, y: 204, w: 42,  h: 108 },
+      { x: 232, y: 94,  w: 56,  h: 62 }
+    ];
+
+    let foods = [];
+    let cursedFood = [];
+
+    let gameStarted = false;
+    let countdownActive = false;
+    let countdownValue = 3;
+    let winRedirectStarted = false;
+
+    function clearKeys() {
+      for (const key in keys) delete keys[key];
+    }
+
+    function makeFoods() {
+      const now = performance.now();
+      foods = [
+        { x: 122, y: 92,  r: 7, taken: false, active: true,  interval: 0,    phase: 0 },
+        { x: 776, y: 96,  r: 7, taken: false, active: false, interval: 2200, phase: now + 300 },
+        { x: 112, y: 438, r: 7, taken: false, active: false, interval: 2500, phase: now + 700 },
+        { x: 788, y: 436, r: 7, taken: false, active: false, interval: 2800, phase: now + 1100 },
+        { x: 450, y: 108, r: 7, taken: false, active: false, interval: 2100, phase: now + 1400 },
+        { x: 450, y: 414, r: 7, taken: false, active: false, interval: 2600, phase: now + 1800 },
+        { x: 250, y: 260, r: 7, taken: false, active: false, interval: 2400, phase: now + 2200 },
+        { x: 652, y: 260, r: 7, taken: false, active: false, interval: 2300, phase: now + 2600 },
+        { x: 364, y: 260, r: 7, taken: false, active: false, interval: 2000, phase: now + 3000 },
+        { x: 536, y: 260, r: 7, taken: false, active: false, interval: 2700, phase: now + 3400 }
+      ];
+      cursedFood = [];
+      world.totalFood = foods.length;
+      totalEl.textContent = world.totalFood;
+    }
+
+    function updateUI() {
+      scoreEl.textContent = world.score;
+      livesEl.textContent = world.lives;
+      timerEl.textContent = world.timeLeft.toFixed(1);
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function circleRectOverlap(circle, rect) {
+      const closestX = clamp(circle.x, rect.x, rect.x + rect.w);
+      const closestY = clamp(circle.y, rect.y, rect.y + rect.h);
+      const dx = circle.x - closestX;
+      const dy = circle.y - closestY;
+      return (dx * dx + dy * dy) < (circle.r * circle.r);
+    }
+
+    function respawnSlug() {
+      slug.x = 25;
+      slug.y = 245;
+      slug.facing = -1;
+      slug.hurtTimer = 60;
+      clearKeys();
+    }
+
+    function resetEnemy() {
+      enemy.x = 450;
+      enemy.y = 260;
+      enemy.lastSafeX = 450;
+      enemy.lastSafeY = 260;
+      enemy.directionIndex = 0;
+      enemy.vx = 0;
+      enemy.vy = -enemy.speed;
+      enemy.state = 'move';
+      enemy.stateTimer = performance.now();
+      enemy.wiggle = 0;
+      enemy.hitFlash = 0;
+      enemy.visible = true;
+      enemy.alpha = 1;
+    }
+
+    function resetCoreState() {
+      levelMusic.pause();
+      levelMusic.currentTime = 0;
+      slug.x = 25;
+      slug.y = 245;
+      slug.facing = -1;
+      slug.hurtTimer = 0;
+      slug.wiggle = 0;
+
+      resetEnemy();
+
+      camperWatch.anchorX = slug.x;
+      camperWatch.anchorY = slug.y;
+      camperWatch.dwellStart = performance.now();
+      camperWatch.active = false;
+
+      world.score = 0;
+      world.lives = 3;
+      world.timeLeft = world.timeLimit;
+      world.lastTime = performance.now();
+      world.win = false;
+      world.lose = false;
+
+      gameStarted = false;
+      countdownActive = false;
+      countdownValue = 3;
+      winRedirectStarted = false;
+
+      clearKeys();
+      makeFoods();
+      updateUI();
+    }
+
+    function resetGame(showStart = true) {
+      resetCoreState();
+      startBtn.disabled = !showStart;
+    }
+
+    function beginWinReturn() {
+      if (winRedirectStarted) return;
+      winRedirectStarted = true;
+      levelMusic.pause();
+      levelMusic.currentTime = 0;
+
+      window.SaltAltarHost.advance(4);
+
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }
+
+    function beginCountdown() {
+      if (countdownActive || gameStarted) return;
+
+      clearKeys();
+      countdownActive = true;
+      countdownValue = 3;
+      startBtn.disabled = true;
+
+      const countdownInterval = setInterval(() => {
+        countdownValue--;
+        if (countdownValue <= 0) {
+          clearInterval(countdownInterval);
+          countdownActive = false;
+          gameStarted = true;
+          world.lastTime = performance.now();
+          enemy.stateTimer = performance.now();
+        }
+      }, 1000);
+    }
+
+    function startFirstRun() {
+      if (countdownActive || gameStarted) return;
+      clearKeys();
+      levelMusic.currentTime = 0;
+      levelMusic.play().catch(() => {});
+      beginCountdown();
+    }
+
+    function restartAfterFail() {
+      clearKeys();
+      resetGame(false);
+      levelMusic.currentTime = 0;
+      levelMusic.play().catch(() => {});
+      beginCountdown();
+    }
+
+    function chooseEnemyDirection() {
+      const dirs = [0, 1, 2, 3];
+      enemy.directionIndex = dirs[Math.floor(Math.random() * dirs.length)];
+      enemy.vx = enemy.directions[enemy.directionIndex].x * enemy.speed;
+      enemy.vy = enemy.directions[enemy.directionIndex].y * enemy.speed;
+    }
+
+    function getSlugQuadrantSpots() {
+      const centerX = slug.x + slug.w / 2;
+      const centerY = slug.y + slug.h / 2;
+      const left = centerX < world.width / 2;
+      const top = centerY < world.height / 2;
+
+      if (left && top) {
+        return [
+          { x: 120, y: 90 },
+          { x: 275, y: 160 },
+          { x: 430, y: 90 },
+          { x: 120, y: 240 }
+        ];
+      }
+      if (!left && top) {
+        return [
+          { x: 730, y: 90 },
+          { x: 605, y: 160 },
+          { x: 430, y: 90 },
+          { x: 730, y: 240 }
+        ];
+      }
+      if (left && !top) {
+        return [
+          { x: 110, y: 390 },
+          { x: 275, y: 315 },
+          { x: 430, y: 390 },
+          { x: 120, y: 240 }
+        ];
+      }
+      return [
+        { x: 730, y: 390 },
+        { x: 605, y: 315 },
+        { x: 430, y: 390 },
+        { x: 730, y: 240 }
+      ];
+    }
+
+    function teleportEnemy() {
+      const defaultSpots = [
+        { x: 120, y: 90 },
+        { x: 730, y: 90 },
+        { x: 110, y: 390 },
+        { x: 730, y: 390 },
+        { x: 430, y: 90 },
+        { x: 430, y: 390 },
+        { x: 120, y: 240 },
+        { x: 730, y: 240 },
+        { x: 430, y: 240 },
+        { x: 275, y: 160 },
+        { x: 605, y: 160 },
+        { x: 275, y: 315 },
+        { x: 605, y: 315 }
+      ];
+
+      const spots = camperWatch.active ? [...getSlugQuadrantSpots(), ...defaultSpots] : defaultSpots;
+
+      for (let tries = 0; tries < 30; tries++) {
+        const pick = spots[Math.floor(Math.random() * Math.min(spots.length, camperWatch.active ? 6 : spots.length))];
+        const next = { x: pick.x, y: pick.y, w: enemy.w, h: enemy.h };
+        if (
+          next.x >= 20 && next.x + next.w <= world.width - 20 &&
+          next.y >= 20 && next.y + next.h <= world.height - 20
+        ) {
+          enemy.x = pick.x;
+          enemy.y = pick.y;
+          enemy.lastSafeX = pick.x;
+          enemy.lastSafeY = pick.y;
+          break;
+        }
+      }
+    }
+
+    function updateEnemy(now) {
+      if (enemy.hitFlash > 0) enemy.hitFlash--;
+
+      if (enemy.state === 'teleport') {
+        const elapsed = now - enemy.stateTimer;
+        enemy.visible = false;
+        enemy.alpha = 0;
+        if (elapsed >= enemy.teleportDuration) {
+          teleportEnemy();
+          chooseEnemyDirection();
+          enemy.state = 'move';
+          enemy.stateTimer = now;
+          enemy.visible = true;
+          enemy.alpha = 1;
+        }
+        enemy.wiggle += 0.07;
+        return;
+      }
+
+      if (enemy.state === 'pause') {
+        const elapsed = now - enemy.stateTimer;
+        enemy.visible = true;
+        enemy.alpha = 0.55 + Math.sin(now / 90) * 0.08;
+        if (elapsed >= enemy.pauseDuration) {
+          enemy.state = 'teleport';
+          enemy.stateTimer = now;
+          enemy.alpha = 0;
+          enemy.visible = false;
+        }
+        enemy.wiggle += 0.06;
+        return;
+      }
+
+      enemy.visible = true;
+      enemy.alpha = 1;
+
+      const next = {
+        x: enemy.x + enemy.vx,
+        y: enemy.y + enemy.vy,
+        w: enemy.w,
+        h: enemy.h
+      };
+
+            if (
+        next.x < 20 || next.x + next.w > world.width - 20 ||
+        next.y < 20 || next.y + next.h > world.height - 20 ||
+        now - enemy.stateTimer >= enemy.moveDuration
+      ) {
+        enemy.state = 'pause';
+        enemy.stateTimer = now;
+        return;
+      }
+
+      enemy.x = next.x;
+      enemy.y = next.y;
+      enemy.lastSafeX = enemy.x;
+      enemy.lastSafeY = enemy.y;
+      enemy.wiggle += 0.18;
+    }
+
+    function getEnemyHitbox() {
+      return {
+        x: enemy.x + 14,
+        y: enemy.y + 16,
+        w: enemy.w - 28,
+        h: enemy.h - 30
+      };
+    }
+
+    function loseLifeAndRespawn(now) {
+      world.lives -= 1;
+      updateUI();
+      respawnSlug();
+      camperWatch.anchorX = slug.x;
+      camperWatch.anchorY = slug.y;
+      camperWatch.dwellStart = now;
+      camperWatch.active = false;
+      if (world.lives <= 0) {
+        world.lose = true;
+        clearKeys();
+        levelMusic.pause();
+        levelMusic.currentTime = 0;
+      }
+    }
+
+    function hitByEnemy() {
+      if (slug.hurtTimer > 0) return;
+      enemy.hitFlash = 12;
+      loseLifeAndRespawn(performance.now());
+    }
+
+    function updateFoodVisibility(now) {
+      for (const food of foods) {
+        if (food.taken) continue;
+        if (food.interval === 0) {
+          food.active = true;
+          continue;
+        }
+        const cycle = Math.floor((now - food.phase) / food.interval);
+        food.active = now >= food.phase && cycle % 2 === 0;
+      }
+    }
+
+    function spawnCursedFood(now) {
+      if (!enemy.visible || enemy.alpha < 0.8 || enemy.state !== 'move') return;
+      if (cursedFood.length >= 3) return;
+      if (!enemy.lastShotTime) enemy.lastShotTime = now;
+      if (now - enemy.lastShotTime < 1600) return;
+
+      const slugCenterX = slug.x + slug.w / 2;
+      const slugCenterY = slug.y + slug.h / 2;
+      const enemyCenterX = enemy.x + enemy.w / 2;
+      const enemyCenterY = enemy.y + enemy.h / 2;
+      const dx = slugCenterX - enemyCenterX;
+      const dy = slugCenterY - enemyCenterY;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      cursedFood.push({
+        x: enemyCenterX,
+        y: enemyCenterY + 6,
+        r: 8,
+        vx: (dx / dist) * 4.6,
+        vy: (dy / dist) * 4.6,
+        life: 1800,
+        born: now
+      });
+      enemy.lastShotTime = now;
+    }
+
+    function updateCursedFood(now) {
+      for (let i = cursedFood.length - 1; i >= 0; i--) {
+        const shot = cursedFood[i];
+        shot.x += shot.vx;
+        shot.y += shot.vy;
+
+        if (
+          shot.x < -20 || shot.x > world.width + 20 ||
+          shot.y < -20 || shot.y > world.height + 20 ||
+          now - shot.born > shot.life
+        ) {
+          cursedFood.splice(i, 1);
+          continue;
+        }
+
+        const shotRect = {
+          x: shot.x - shot.r,
+          y: shot.y - shot.r,
+          w: shot.r * 2,
+          h: shot.r * 2
+        };
+
+        const slugHitbox = {
+          x: slug.x + 6,
+          y: slug.y + 6,
+          w: slug.w - 12,
+          h: slug.h - 8
+        };
+
+        if (slug.hurtTimer <= 0 && circleRectOverlap({ x: shot.x, y: shot.y, r: shot.r }, slugHitbox)) {
+          cursedFood.splice(i, 1);
+          loseLifeAndRespawn(now);
+          continue;
+        }
+      }
+    }
+
+    function update() {
+      if (world.win || world.lose) return;
+      if (!gameStarted) return;
+
+      const now = performance.now();
+      const dt = (now - world.lastTime) / 1000;
+      world.lastTime = now;
+
+      world.timeLeft = Math.max(0, world.timeLeft - dt);
+      timerEl.textContent = world.timeLeft.toFixed(1);
+
+      if (world.timeLeft <= 0) {
+        world.lose = true;
+        clearKeys();
+        levelMusic.pause();
+        levelMusic.currentTime = 0;
+        return;
+      }
+
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['arrowleft'] || keys['a']) {
+        dx -= slug.speed;
+        slug.facing = -1;
+      }
+      if (keys['arrowright'] || keys['d']) {
+        dx += slug.speed;
+        slug.facing = 1;
+      }
+      if (keys['arrowup'] || keys['w']) dy -= slug.speed;
+      if (keys['arrowdown'] || keys['s']) dy += slug.speed;
+
+      const nextX = clamp(slug.x + dx, 0, world.width - slug.w);
+      const nextY = clamp(slug.y + dy, 0, world.height - slug.h);
+      const nextSlug = { x: nextX, y: nextY, w: slug.w, h: slug.h };
+
+      let hitSalt = false;
+      for (const block of saltBlocks) {
+        if (rectsOverlap(nextSlug, block)) {
+          hitSalt = true;
+          break;
+        }
+      }
+
+      if (!hitSalt) {
+        slug.x = nextX;
+        slug.y = nextY;
+      } else if (slug.hurtTimer <= 0) {
+        loseLifeAndRespawn(now)
+      }
+
+      const movedDist = Math.hypot(slug.x - camperWatch.anchorX, slug.y - camperWatch.anchorY);
+      if (movedDist > camperWatch.radius) {
+        camperWatch.anchorX = slug.x;
+        camperWatch.anchorY = slug.y;
+        camperWatch.dwellStart = now;
+        camperWatch.active = false;
+      } else if (now - camperWatch.dwellStart >= camperWatch.threshold) {
+        camperWatch.active = true;
+      }
+
+      updateEnemy(now);
+      updateFoodVisibility(now);
+      spawnCursedFood(now);
+      updateCursedFood(now);
+
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8
+      };
+
+      if (enemy.visible && enemy.alpha > 0.55 && rectsOverlap(slugHitbox, getEnemyHitbox())) {
+        hitByEnemy();
+      }
+
+      slug.wiggle += 0.18;
+      if (slug.hurtTimer > 0) slug.hurtTimer--;
+
+      const mouth = {
+        x: slug.x + slug.w * 0.72,
+        y: slug.y + slug.h * 0.48,
+        r: 12,
+      };
+
+      const pickupZone = {
+        x: slug.x + 10,
+        y: slug.y + 6,
+        w: slug.w - 8,
+        h: slug.h - 4,
+      };
+
+      for (const food of foods) {
+        if (!food.taken && food.active && (
+          circleRectOverlap(food, {
+            x: mouth.x - 13,
+            y: mouth.y - 13,
+            w: 26,
+            h: 26
+          }) ||
+          circleRectOverlap(food, pickupZone)
+        )) {
+          food.taken = true;
+          food.active = false;
+          world.score += 1;
+          updateUI();
+        }
+      }
+
+      if (world.score === world.totalFood) {
+        world.win = true;
+        clearKeys();
+        beginWinReturn();
+      }
+    }
+
+    function drawBackground() {
+      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bg.addColorStop(0, '#050605');
+      bg.addColorStop(1, '#111612');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 40; i++) {
+        const x = (i * 97) % canvas.width;
+        const y = (i * 61) % canvas.height;
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(180, 220, 170, 0.035)' : 'rgba(255,255,255,0.02)';
+        ctx.beginPath();
+        ctx.arc(x, y, 1 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(70, 95, 70, 0.18)';
+      ctx.lineWidth = 2;
+      for (let x = 60; x < canvas.width; x += 150) {
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height);
+        ctx.quadraticCurveTo(x - 20, canvas.height - 90, x + 10, canvas.height - 180);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(12, 18, 12, 0.85)';
+      ctx.fillRect(0, canvas.height - 70, canvas.width, 70);
+
+      ctx.strokeStyle = 'rgba(165, 210, 188, 0.07)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(450, 260, 175, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawSaltBlock(block) {
+      const x = block.x;
+      const y = block.y;
+      const w = block.w;
+      const h = block.h;
+
+      const glow = ctx.createRadialGradient(
+        x + w / 2, y + h / 2, 6,
+        x + w / 2, y + h / 2, Math.max(w, h) * 0.65
+      );
+      glow.addColorStop(0, 'rgba(200,245,230,0.10)');
+      glow.addColorStop(1, 'rgba(200,245,230,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 16, y - 16, w + 32, h + 32);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.48, y + h + 8, w * 0.42, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const shards = [
+        { cx: x + w * 0.22, cy: y + h * 0.62, sw: w * 0.34, sh: h * 0.72 },
+        { cx: x + w * 0.50, cy: y + h * 0.50, sw: w * 0.42, sh: h * 0.98 },
+        { cx: x + w * 0.76, cy: y + h * 0.64, sw: w * 0.30, sh: h * 0.68 }
+      ];
+
+      if (w > 90) {
+        shards.push({ cx: x + w * 0.12, cy: y + h * 0.76, sw: w * 0.18, sh: h * 0.40 });
+      }
+
+      for (const shard of shards) {
+        const sx = shard.cx;
+        const sy = shard.cy;
+        const sw = shard.sw;
+        const sh = shard.sh;
+
+        const poly = [
+          { x: sx - sw * 0.45, y: sy + sh * 0.25 },
+          { x: sx - sw * 0.10, y: sy - sh * 0.48 },
+          { x: sx + sw * 0.22, y: sy - sh * 0.42 },
+          { x: sx + sw * 0.42, y: sy - sh * 0.05 },
+          { x: sx + sw * 0.30, y: sy + sh * 0.50 },
+          { x: sx - sw * 0.20, y: sy + sh * 0.56 }
+        ];
+
+        ctx.fillStyle = 'rgba(235,255,248,0.85)';
+        ctx.strokeStyle = '#0f1912';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(175,225,210,0.55)';
+        ctx.beginPath();
+        ctx.moveTo(poly[1].x, poly[1].y);
+        ctx.lineTo(poly[2].x, poly[2].y);
+        ctx.lineTo(poly[3].x, poly[3].y);
+        ctx.lineTo(sx + sw * 0.05, sy + sh * 0.12);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.45)';
+        ctx.beginPath();
+        ctx.moveTo(sx - sw * 0.06, sy - sh * 0.28);
+        ctx.lineTo(sx + sw * 0.05, sy - sh * 0.38);
+        ctx.lineTo(sx + sw * 0.12, sy - sh * 0.06);
+        ctx.lineTo(sx + sw * 0.00, sy + sh * 0.08);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = 'rgba(120,160,145,0.45)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(sx - sw * 0.04, sy - sh * 0.30);
+        ctx.lineTo(sx - sw * 0.08, sy + sh * 0.44);
+        ctx.stroke();
+      }
+    }
+
+    function drawFood(food, now) {
+      if (food.taken || !food.active) return;
+
+      const pulse = 1 + Math.sin(now / 130 + food.x * 0.01) * 0.18;
+      ctx.beginPath();
+      ctx.fillStyle = '#f7fff5';
+      ctx.arc(food.x, food.y, food.r * pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#97d48a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(180, 255, 180, 0.16)';
+      ctx.arc(food.x, food.y, food.r + 5 + Math.sin(now / 160) * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawSlugBody(baseA, baseB, hurtFlash) {
+      const bodyGrad = ctx.createLinearGradient(0, 0, slug.w, slug.h);
+      bodyGrad.addColorStop(0, hurtFlash ? '#6f7b58' : baseA);
+      bodyGrad.addColorStop(1, hurtFlash ? '#303926' : baseB);
+      ctx.fillStyle = bodyGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(5, slug.h - 1);
+      ctx.quadraticCurveTo(10, 4, 28, 5);
+      ctx.quadraticCurveTo(44, 5, 55, 16);
+      ctx.quadraticCurveTo(61, 22, 56, 28);
+      ctx.quadraticCurveTo(51, 31, 36, 30);
+      ctx.lineTo(10, 30);
+      ctx.quadraticCurveTo(2, 29, 5, slug.h - 1);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(16, 11);
+      ctx.lineTo(15, -5);
+      ctx.moveTo(28, 10);
+      ctx.lineTo(31, -7);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e9f7df';
+      ctx.beginPath();
+      ctx.arc(15, -5, 3.5, 0, Math.PI * 2);
+      ctx.arc(31, -7, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0a0d08';
+      ctx.beginPath();
+      ctx.arc(15, -5, 1.8, 0, Math.PI * 2);
+      ctx.arc(31, -7, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(20, 15, 1.7, 0, Math.PI * 2);
+      ctx.arc(31, 14, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#10150c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(37, 19);
+      ctx.quadraticCurveTo(44, 22, 37, 25);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#a9c56d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(12, 24);
+      ctx.quadraticCurveTo(18, 20, 24, 24);
+      ctx.quadraticCurveTo(30, 28, 36, 24);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(210, 255, 210, 0.08)';
+      ctx.beginPath();
+      ctx.ellipse(22, 12, 10, 4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDefaultSlug() {
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+      drawSlugBody('#6e7f56', '#2b3323', isHurtFlash);
+    }
+
+    function drawSlug() {
+      const bob = Math.sin(slug.wiggle) * 2;
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+
+      ctx.save();
+      ctx.translate(slug.x + slug.w / 2, slug.y + slug.h / 2 + bob);
+      if (slug.facing === 1) ctx.scale(-1, 1);
+      ctx.translate(-slug.w / 2, -slug.h / 2);
+      if (isHurtFlash) ctx.globalAlpha = 0.65;
+      drawDefaultSlug();
+      ctx.restore();
+    }
+
+    function drawWatcher(now) {
+      if (!enemy.visible && enemy.alpha <= 0) return;
+
+      const bob = Math.sin(enemy.wiggle) * 3;
+      const flash = enemy.hitFlash > 0 && Math.floor(enemy.hitFlash / 2) % 2 === 0;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, Math.min(1, enemy.alpha));
+      ctx.translate(enemy.x + enemy.w / 2, enemy.y + enemy.w / 2 + bob);
+
+      ctx.fillStyle = 'rgba(0,0,0,0.20)';
+      ctx.beginPath();
+      ctx.ellipse(0, 34, 38, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = flash ? '#8f759f' : '#5c466d';
+      ctx.beginPath();
+      ctx.ellipse(0, -6, 28, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#43324f';
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 34, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      for (let i = 0; i < 6; i++) {
+        const angle = -1.6 + i * 0.62 + Math.sin(now / 260 + i) * 0.08;
+        const x1 = Math.cos(angle) * 12;
+        const y1 = 10 + Math.sin(angle) * 6;
+        const x2 = Math.cos(angle) * 24;
+        const y2 = 28 + Math.sin(now / 180 + i) * 6;
+        const x3 = Math.cos(angle) * 30;
+        const y3 = 42 + Math.sin(now / 140 + i) * 8;
+
+        ctx.strokeStyle = '#6e5880';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.quadraticCurveTo(x2, y2, x3, y3);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#f1f7e8';
+      ctx.beginPath();
+      ctx.arc(-10, -10, 5, 0, Math.PI * 2);
+      ctx.arc(0, -13, 5, 0, Math.PI * 2);
+      ctx.arc(10, -10, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0d100d';
+      ctx.beginPath();
+      ctx.arc(-10, -10, 2, 0, Math.PI * 2);
+      ctx.arc(0, -13, 2, 0, Math.PI * 2);
+      ctx.arc(10, -10, 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (enemy.state === 'pause') {
+        ctx.strokeStyle = 'rgba(220, 210, 255, 0.45)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, 42, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawCursedFood(now) {
+      for (const shot of cursedFood) {
+        const pulse = 1 + Math.sin(now / 90 + shot.x * 0.02) * 0.15;
+        ctx.beginPath();
+        ctx.fillStyle = '#ff4b4b';
+        ctx.arc(shot.x, shot.y, shot.r * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ffd0d0';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(255, 90, 90, 0.18)';
+        ctx.arc(shot.x, shot.y, shot.r + 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawMessage() {
+      if (!world.win && !world.lose && !countdownActive && gameStarted) return;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+
+      if (countdownActive) {
+        ctx.font = 'bold 80px Arial';
+        ctx.fillText(String(countdownValue), canvas.width / 2, canvas.height / 2);
+      } else if (!gameStarted) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Press Start', canvas.width / 2, canvas.height / 2);
+      } else if (world.win) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Offering Accepted!', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Returning to altar...', canvas.width / 2, canvas.height / 2 + 35);
+      } else if (world.lose) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('The ritual failed.', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Press Restart to play again', canvas.width / 2, canvas.height / 2 + 35);
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    function draw() {
+      const now = performance.now();
+      drawBackground();
+      for (const block of saltBlocks) drawSaltBlock(block);
+      for (const food of foods) drawFood(food, now);
+      drawCursedFood(now);
+      drawWatcher(now);
+      drawSlug();
+      drawMessage();
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = false;
+      }
+    });
+
+    window.addEventListener('blur', clearKeys);
+
+    startBtn.addEventListener('click', startFirstRun);
+    restartBtn.addEventListener('click', restartAfterFail);
+
+    resetGame(true);
+    loop();
+  </script>
+</body>
+</html>

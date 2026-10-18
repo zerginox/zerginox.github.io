@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salt Altar — Level 4 | Zerginox</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #060708;
+      color: #d7e0d2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(95vw, 920px);
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #dbe7d1;
+      text-shadow: 0 0 10px rgba(170, 205, 150, 0.18);
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #aab4a4;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      border: 4px solid #171b17;
+      background: #0a0d0a;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.65);
+    }
+
+    .ui {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 2px solid #2b312b;
+      background: #121612;
+      color: #d7e0d2;
+      padding: 8px 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .legend {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      color: #8f998b;
+    }
+  </style>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="portal.css"><script src="portal.js"></script>
+</head>
+<body class="salt-level">
+<header class="portal-nav"><a class="portal-brand" href="../../">Zerginox</a><span class="portal-level">Salt Altar / Ritual 04</span><nav aria-label="Game navigation"><a href="index.html">← Level select</a><a href="../../#games">All games</a></nav></header>
+  <div class="wrap">
+    <h1>Salt Altar</h1>
+    <p>Level 4 — Gather the offerings while the center altar spins, spits slime, and the salt pillars erupt.</p>
+
+    <div class="ui">
+      <div><strong>Food:</strong> <span id="score">0</span> / <span id="total">0</span></div>
+      <div><strong>Lives:</strong> <span id="lives">3</span></div>
+      <div><strong>Time:</strong> <span id="timer">36.0</span>s</div>
+      <div>
+        <button id="startBtn">Start</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <canvas id="game" width="900" height="520"></canvas>
+<div class="touch-controls" role="group" aria-label="Touch movement controls"><button type="button" data-key="ArrowLeft" aria-label="Move left">←</button><div class="vertical-controls"><button type="button" data-key="ArrowUp" aria-label="Move up">↑</button><button type="button" data-key="ArrowDown" aria-label="Move down">↓</button></div><button type="button" data-key="ArrowRight" aria-label="Move right">→</button></div>
+
+    <p class="legend">Press Start • Countdown begins • Then move with Arrow keys, WASD, or the touch controls</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const totalEl = document.getElementById('total');
+    const livesEl = document.getElementById('lives');
+    const timerEl = document.getElementById('timer');
+    const restartBtn = document.getElementById('restartBtn');
+    const startBtn = document.getElementById('startBtn');
+
+    const keys = {};
+
+    const world = {
+      width: canvas.width,
+      height: canvas.height,
+      score: 0,
+      totalFood: 0,
+      lives: 3,
+      timeLimit: 36,
+      timeLeft: 36,
+      lastTime: 0,
+      win: false,
+      lose: false,
+    };
+
+    const slug = {
+      x: 60,
+      y: 246,
+      w: 56,
+      h: 32,
+      speed: 2.65,
+      facing: 1,
+      wiggle: 0,
+      hurtTimer: 0,
+    };
+
+    const centerAltar = {
+      x: 450,
+      y: 260,
+      radius: 56,
+      rotation: 0,
+      spinSpeed: 0.032,
+      burstTimer: 0,
+      burstInterval: 1000,
+      burstRotation: 0,
+      mouthPulse: 0,
+    };
+
+    const pillarSystem = {
+      explodeTimer: 0,
+      explodeInterval: 6000,
+      activeBursts: [],
+    };
+
+    const slimeShots = [];
+
+    const pillars = [
+      { x: 120, y: 92,  w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 300, y: 92,  w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 568, y: 92,  w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 748, y: 92,  w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 120, y: 340, w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 300, y: 340, w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 568, y: 340, w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+      { x: 748, y: 340, w: 32, h: 48, exploded: false, flash: 0, blastRadius: 58 },
+    ];
+
+    let foods = [];
+    let gameStarted = false;
+    let countdownActive = false;
+    let countdownValue = 3;
+    let winRedirectStarted = false;
+
+    function clearKeys() {
+      for (const key in keys) delete keys[key];
+    }
+
+    function makeFoods() {
+      foods = [
+        { x: 96,  y: 78,  r: 7, taken: false },
+        { x: 146, y: 148, r: 7, taken: false },
+        { x: 224, y: 152, r: 7, taken: false },
+        { x: 274, y: 212, r: 7, taken: false },
+        { x: 136, y: 344, r: 7, taken: false },
+        { x: 186, y: 410, r: 7, taken: false },
+        { x: 418, y: 76,  r: 7, taken: false },
+        { x: 468, y: 146, r: 7, taken: false },
+        { x: 596, y: 176, r: 7, taken: false },
+        { x: 646, y: 242, r: 7, taken: false },
+      ];
+      world.totalFood = foods.length;
+      totalEl.textContent = world.totalFood;
+    }
+
+    function updateUI() {
+      scoreEl.textContent = world.score;
+      livesEl.textContent = world.lives;
+      timerEl.textContent = world.timeLeft.toFixed(1);
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function circleRectOverlap(circle, rect) {
+      const closestX = clamp(circle.x, rect.x, rect.x + rect.w);
+      const closestY = clamp(circle.y, rect.y, rect.y + rect.h);
+      const dx = circle.x - closestX;
+      const dy = circle.y - closestY;
+      return (dx * dx + dy * dy) < (circle.r * circle.r);
+    }
+
+    function respawnSlug() {
+      slug.x = 60;
+      slug.y = 246;
+      slug.facing = 1;
+      slug.hurtTimer = 60;
+      clearKeys();
+    }
+
+    function resetPillars() {
+      for (const pillar of pillars) {
+        pillar.exploded = false;
+        pillar.flash = 0;
+      }
+      pillarSystem.activeBursts = [];
+      pillarSystem.explodeTimer = 0;
+    }
+
+    function resetCoreState() {
+      slug.x = 60;
+      slug.y = 246;
+      slug.facing = 1;
+      slug.hurtTimer = 0;
+      slug.wiggle = 0;
+
+      centerAltar.rotation = 0;
+      centerAltar.burstTimer = 0;
+      centerAltar.burstRotation = 0;
+      centerAltar.mouthPulse = 0;
+
+      slimeShots.length = 0;
+      resetPillars();
+
+      world.score = 0;
+      world.lives = 3;
+      world.timeLeft = world.timeLimit;
+      world.lastTime = performance.now();
+      world.win = false;
+      world.lose = false;
+
+      gameStarted = false;
+      countdownActive = false;
+      countdownValue = 3;
+      winRedirectStarted = false;
+
+      clearKeys();
+      makeFoods();
+      updateUI();
+    }
+
+    function resetGame(showStart = true) {
+      resetCoreState();
+      startBtn.disabled = !showStart;
+    }
+
+    function beginWinReturn() {
+      if (winRedirectStarted) return;
+      winRedirectStarted = true;
+      window.SaltAltarHost.advance(5);
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }
+
+    function beginCountdown() {
+      if (countdownActive || gameStarted) return;
+
+      clearKeys();
+      countdownActive = true;
+      countdownValue = 3;
+      startBtn.disabled = true;
+
+      const countdownInterval = setInterval(() => {
+        countdownValue--;
+        if (countdownValue <= 0) {
+          clearInterval(countdownInterval);
+          countdownActive = false;
+          gameStarted = true;
+          world.lastTime = performance.now();
+        }
+      }, 1000);
+    }
+
+    function startFirstRun() {
+      if (countdownActive || gameStarted) return;
+      clearKeys();
+      beginCountdown();
+    }
+
+    function restartAfterFail() {
+      clearKeys();
+      resetGame(false);
+      beginCountdown();
+    }
+
+    function loseLifeAndRespawn() {
+      world.lives -= 1;
+      updateUI();
+      respawnSlug();
+      if (world.lives <= 0) {
+        world.lose = true;
+        clearKeys();
+      }
+    }
+
+    function fireSlimeBurst() {
+      centerAltar.burstRotation += Math.PI / 7;
+      const shotCount = 6;
+      const speed = 3.25;
+
+      for (let i = 0; i < shotCount; i++) {
+        const angle = centerAltar.burstRotation + (Math.PI * 2 / shotCount) * i;
+        slimeShots.push({
+          x: centerAltar.x,
+          y: centerAltar.y,
+          r: 8,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 2200,
+          born: performance.now(),
+        });
+      }
+    }
+
+    function flashNextPillar() {
+      const available = pillars.filter(p => !p.exploded && p.flash <= 0);
+      if (!available.length) return;
+      const pillar = available[Math.floor(Math.random() * available.length)];
+      pillar.flash = 650;
+    }
+
+    function explodeFlashingPillars(dt) {
+      for (const pillar of pillars) {
+        if (pillar.exploded || pillar.flash <= 0) continue;
+        pillar.flash -= dt * 1000;
+        if (pillar.flash <= 0) {
+          pillar.exploded = true;
+          pillar.flash = 0;
+          pillarSystem.activeBursts.push({
+            x: pillar.x + pillar.w / 2,
+            y: pillar.y + pillar.h / 2,
+            radius: pillar.blastRadius,
+            timer: 900,
+          });
+        }
+      }
+    }
+
+    function updateShots(now) {
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8
+      };
+
+      for (let i = slimeShots.length - 1; i >= 0; i--) {
+        const shot = slimeShots[i];
+        shot.x += shot.vx;
+        shot.y += shot.vy;
+
+        if (
+          shot.x < -20 || shot.x > world.width + 20 ||
+          shot.y < -20 || shot.y > world.height + 20 ||
+          now - shot.born > shot.life
+        ) {
+          slimeShots.splice(i, 1);
+          continue;
+        }
+
+        if (slug.hurtTimer <= 0 && circleRectOverlap({ x: shot.x, y: shot.y, r: shot.r }, slugHitbox)) {
+          slimeShots.splice(i, 1);
+          loseLifeAndRespawn();
+          break;
+        }
+      }
+    }
+
+    function updateBursts(dt) {
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8
+      };
+
+      for (let i = pillarSystem.activeBursts.length - 1; i >= 0; i--) {
+        const burst = pillarSystem.activeBursts[i];
+        burst.timer -= dt * 1000;
+
+        if (slug.hurtTimer <= 0 && circleRectOverlap({ x: burst.x, y: burst.y, r: burst.radius }, slugHitbox)) {
+          pillarSystem.activeBursts.splice(i, 1);
+          loseLifeAndRespawn();
+          break;
+        }
+
+        if (burst.timer <= 0) {
+          pillarSystem.activeBursts.splice(i, 1);
+        }
+      }
+    }
+
+    function update() {
+      if (world.win || world.lose) return;
+      if (!gameStarted) return;
+
+      const now = performance.now();
+      const dt = (now - world.lastTime) / 1000;
+      world.lastTime = now;
+
+      world.timeLeft = Math.max(0, world.timeLeft - dt);
+      timerEl.textContent = world.timeLeft.toFixed(1);
+
+      if (world.timeLeft <= 0) {
+        world.lose = true;
+        clearKeys();
+        return;
+      }
+
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['arrowleft'] || keys['a']) {
+        dx -= slug.speed;
+        slug.facing = -1;
+      }
+      if (keys['arrowright'] || keys['d']) {
+        dx += slug.speed;
+        slug.facing = 1;
+      }
+      if (keys['arrowup'] || keys['w']) dy -= slug.speed;
+      if (keys['arrowdown'] || keys['s']) dy += slug.speed;
+
+      const nextX = clamp(slug.x + dx, 0, world.width - slug.w);
+      const nextY = clamp(slug.y + dy, 0, world.height - slug.h);
+      slug.x = nextX;
+      slug.y = nextY;
+
+      const pillarHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8
+      };
+
+      if (slug.hurtTimer <= 0) {
+        for (const pillar of pillars) {
+          if (pillar.exploded) continue;
+          if (rectsOverlap(pillarHitbox, pillar)) {
+            loseLifeAndRespawn();
+            return;
+          }
+        }
+      }
+
+      centerAltar.rotation += centerAltar.spinSpeed;
+      centerAltar.mouthPulse += 0.16;
+      centerAltar.burstTimer += dt * 1000;
+      pillarSystem.explodeTimer += dt * 1000;
+
+      if (centerAltar.burstTimer >= centerAltar.burstInterval) {
+        centerAltar.burstTimer = 0;
+        fireSlimeBurst();
+      }
+
+      if (pillarSystem.explodeTimer >= pillarSystem.explodeInterval) {
+        pillarSystem.explodeTimer = 0;
+        flashNextPillar();
+      }
+
+      explodeFlashingPillars(dt);
+      updateShots(now);
+      updateBursts(dt);
+
+      slug.wiggle += 0.18;
+      if (slug.hurtTimer > 0) slug.hurtTimer--;
+
+      const mouth = {
+        x: slug.x + (slug.facing === 1 ? slug.w * 0.72 : slug.w * 0.28),
+        y: slug.y + slug.h * 0.48,
+        r: 12,
+      };
+
+      const pickupZone = {
+        x: slug.x + 10,
+        y: slug.y + 6,
+        w: slug.w - 8,
+        h: slug.h - 4,
+      };
+
+      for (const food of foods) {
+        if (!food.taken && (
+          circleRectOverlap(food, {
+            x: mouth.x - 13,
+            y: mouth.y - 13,
+            w: 26,
+            h: 26
+          }) ||
+          circleRectOverlap(food, pickupZone)
+        )) {
+          food.taken = true;
+          world.score += 1;
+          updateUI();
+        }
+      }
+
+      if (world.score === world.totalFood) {
+        world.win = true;
+        clearKeys();
+        beginWinReturn();
+      }
+    }
+
+    function drawBackground() {
+      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bg.addColorStop(0, '#050605');
+      bg.addColorStop(1, '#111612');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 40; i++) {
+        const x = (i * 97) % canvas.width;
+        const y = (i * 61) % canvas.height;
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(180, 220, 170, 0.035)' : 'rgba(255,255,255,0.02)';
+        ctx.beginPath();
+        ctx.arc(x, y, 1 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(70, 95, 70, 0.18)';
+      ctx.lineWidth = 2;
+      for (let x = 60; x < canvas.width; x += 150) {
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height);
+        ctx.quadraticCurveTo(x - 20, canvas.height - 90, x + 10, canvas.height - 180);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = 'rgba(12, 18, 12, 0.85)';
+      ctx.fillRect(0, canvas.height - 70, canvas.width, 70);
+
+      ctx.strokeStyle = 'rgba(165, 210, 188, 0.07)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(450, 260, 175, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawPillar(pillar, now) {
+      if (pillar.exploded) return;
+
+      const x = pillar.x;
+      const y = pillar.y;
+      const w = pillar.w;
+      const h = pillar.h;
+
+      const glow = ctx.createRadialGradient(
+        x + w / 2, y + h / 2, 6,
+        x + w / 2, y + h / 2, Math.max(w, h) * 0.9
+      );
+      glow.addColorStop(0, 'rgba(200,245,230,0.10)');
+      glow.addColorStop(1, 'rgba(200,245,230,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 16, y - 16, w + 32, h + 32);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.48, y + h + 8, w * 0.50, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const flashOn = pillar.flash > 0 && Math.floor(now / 90) % 2 === 0;
+      const base = flashOn ? 'rgba(255,240,240,0.96)' : 'rgba(235,255,248,0.88)';
+      const tint = flashOn ? 'rgba(255,120,120,0.55)' : 'rgba(175,225,210,0.55)';
+
+      const shards = [
+        { cx: x + w * 0.24, cy: y + h * 0.64, sw: w * 0.54, sh: h * 0.76 },
+        { cx: x + w * 0.54, cy: y + h * 0.50, sw: w * 0.62, sh: h * 1.00 },
+        { cx: x + w * 0.78, cy: y + h * 0.64, sw: w * 0.42, sh: h * 0.70 }
+      ];
+
+      for (const shard of shards) {
+        const sx = shard.cx;
+        const sy = shard.cy;
+        const sw = shard.sw;
+        const sh = shard.sh;
+
+        const poly = [
+          { x: sx - sw * 0.45, y: sy + sh * 0.25 },
+          { x: sx - sw * 0.10, y: sy - sh * 0.48 },
+          { x: sx + sw * 0.22, y: sy - sh * 0.42 },
+          { x: sx + sw * 0.42, y: sy - sh * 0.05 },
+          { x: sx + sw * 0.30, y: sy + sh * 0.50 },
+          { x: sx - sw * 0.20, y: sy + sh * 0.56 }
+        ];
+
+        ctx.fillStyle = base;
+        ctx.strokeStyle = '#0f1912';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = tint;
+        ctx.beginPath();
+        ctx.moveTo(poly[1].x, poly[1].y);
+        ctx.lineTo(poly[2].x, poly[2].y);
+        ctx.lineTo(poly[3].x, poly[3].y);
+        ctx.lineTo(sx + sw * 0.05, sy + sh * 0.12);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawCenterAltar(now) {
+      ctx.save();
+      ctx.translate(centerAltar.x, centerAltar.y);
+      ctx.rotate(centerAltar.rotation);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.50)';
+      ctx.beginPath();
+      ctx.ellipse(0, 14, centerAltar.radius, centerAltar.radius * 0.54, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const outer = [
+        { x: -14, y: -57 }, { x: 5, y: -60 }, { x: 24, y: -53 }, { x: 41, y: -40 },
+        { x: 55, y: -16 }, { x: 58, y: 6 }, { x: 45, y: 29 }, { x: 26, y: 47 },
+        { x: 3, y: 59 }, { x: -19, y: 54 }, { x: -39, y: 43 }, { x: -54, y: 22 },
+        { x: -60, y: 0 }, { x: -50, y: -24 }, { x: -33, y: -45 }
+      ];
+
+      ctx.beginPath();
+      ctx.moveTo(outer[0].x, outer[0].y);
+      for (let i = 1; i < outer.length; i++) ctx.lineTo(outer[i].x, outer[i].y);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(224,242,232,0.84)';
+      ctx.strokeStyle = '#0f1912';
+      ctx.lineWidth = 3;
+      ctx.fill();
+      ctx.stroke();
+
+      const bloodDisc = [
+        { x: -6, y: -27 }, { x: 11, y: -24 }, { x: 23, y: -12 }, { x: 20, y: 6 },
+        { x: 8, y: 20 }, { x: -10, y: 23 }, { x: -23, y: 11 }, { x: -20, y: -8 }
+      ];
+      ctx.beginPath();
+      ctx.moveTo(bloodDisc[0].x, bloodDisc[0].y);
+      for (let i = 1; i < bloodDisc.length; i++) ctx.lineTo(bloodDisc[i].x, bloodDisc[i].y);
+      ctx.closePath();
+      ctx.fillStyle = '#4a1218';
+      ctx.strokeStyle = '#22070b';
+      ctx.lineWidth = 2.5;
+      ctx.fill();
+      ctx.stroke();
+
+      const darkCore = [
+        { x: -3, y: -11 }, { x: 6, y: -9 }, { x: 11, y: -1 }, { x: 8, y: 8 },
+        { x: 0, y: 12 }, { x: -9, y: 7 }, { x: -12, y: -2 }, { x: -8, y: -9 }
+      ];
+      ctx.beginPath();
+      ctx.moveTo(darkCore[0].x, darkCore[0].y);
+      for (let i = 1; i < darkCore.length; i++) ctx.lineTo(darkCore[i].x, darkCore[i].y);
+      ctx.closePath();
+      ctx.fillStyle = '#2a090d';
+      ctx.fill();
+
+      // eye in center
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 13, 8, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#d9d1c2';
+      ctx.fill();
+      ctx.strokeStyle = '#120d0c';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 5, 7, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#17080b';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(-2, -2, 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(26,5,8,0.95)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(-17, -6); ctx.lineTo(-4, -2); ctx.lineTo(-14, 11);
+      ctx.moveTo(15, -14); ctx.lineTo(4, -4); ctx.lineTo(12, 11);
+      ctx.moveTo(-1, -18); ctx.lineTo(1, -7); ctx.lineTo(7, 6);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    function drawFood(food, now) {
+      if (food.taken) return;
+
+      const pulse = 1 + Math.sin(now / 130 + food.x * 0.01) * 0.06;
+      ctx.beginPath();
+      ctx.fillStyle = '#f7fff5';
+      ctx.arc(food.x, food.y, food.r * pulse, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0f1912';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    function drawSlimeShots(now) {
+      for (const shot of slimeShots) {
+        const pulse = 1 + Math.sin(now / 90 + shot.x * 0.02) * 0.15;
+        ctx.beginPath();
+        ctx.fillStyle = '#7f9f88';
+        ctx.arc(shot.x, shot.y, shot.r * pulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#d7e0d2';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.fillStyle = 'rgba(235,245,238,0.16)';
+        ctx.arc(shot.x - 2, shot.y - 2, 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    function drawBursts(now) {
+      for (const burst of pillarSystem.activeBursts) {
+        const pulse = 1 + Math.sin(now / 70) * 0.10;
+        ctx.beginPath();
+        ctx.arc(burst.x, burst.y, burst.radius * pulse, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(220, 228, 220, 0.11)';
+        ctx.fill();
+
+        ctx.beginPath();
+        for (let i = 0; i < 18; i++) {
+          const angle = (Math.PI * 2 / 18) * i;
+          const radius = i % 2 === 0 ? burst.radius : burst.radius - 12;
+          const px = burst.x + Math.cos(angle) * radius * pulse;
+          const py = burst.y + Math.sin(angle) * radius * pulse;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = 'rgba(205, 220, 208, 0.78)';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      }
+    }
+
+    function drawSlugBody(baseA, baseB, hurtFlash) {
+      const bodyGrad = ctx.createLinearGradient(0, 0, slug.w, slug.h);
+      bodyGrad.addColorStop(0, hurtFlash ? '#6f7b58' : baseA);
+      bodyGrad.addColorStop(1, hurtFlash ? '#303926' : baseB);
+      ctx.fillStyle = bodyGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(5, slug.h - 1);
+      ctx.quadraticCurveTo(10, 4, 28, 5);
+      ctx.quadraticCurveTo(44, 5, 55, 16);
+      ctx.quadraticCurveTo(61, 22, 56, 28);
+      ctx.quadraticCurveTo(51, 31, 36, 30);
+      ctx.lineTo(10, 30);
+      ctx.quadraticCurveTo(2, 29, 5, slug.h - 1);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(16, 11);
+      ctx.lineTo(15, -5);
+      ctx.moveTo(28, 10);
+      ctx.lineTo(31, -7);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e9f7df';
+      ctx.beginPath();
+      ctx.arc(15, -5, 3.5, 0, Math.PI * 2);
+      ctx.arc(31, -7, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0a0d08';
+      ctx.beginPath();
+      ctx.arc(15, -5, 1.8, 0, Math.PI * 2);
+      ctx.arc(31, -7, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(20, 15, 1.7, 0, Math.PI * 2);
+      ctx.arc(31, 14, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#10150c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(37, 19);
+      ctx.quadraticCurveTo(44, 22, 37, 25);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#a9c56d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(12, 24);
+      ctx.quadraticCurveTo(18, 20, 24, 24);
+      ctx.quadraticCurveTo(30, 28, 36, 24);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(210, 255, 210, 0.08)';
+      ctx.beginPath();
+      ctx.ellipse(22, 12, 10, 4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDefaultSlug() {
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+      drawSlugBody('#6e7f56', '#2b3323', isHurtFlash);
+    }
+
+    function drawSlug() {
+      const bob = Math.sin(slug.wiggle) * 2;
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+
+      ctx.save();
+      ctx.translate(slug.x + slug.w / 2, slug.y + slug.h / 2 + bob);
+      if (slug.facing === -1) ctx.scale(-1, 1);
+      ctx.translate(-slug.w / 2, -slug.h / 2);
+      if (isHurtFlash) ctx.globalAlpha = 0.65;
+      drawDefaultSlug();
+      ctx.restore();
+    }
+
+    function drawMessage() {
+      if (!world.win && !world.lose && !countdownActive && gameStarted) return;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+
+      if (countdownActive) {
+        ctx.font = 'bold 80px Arial';
+        ctx.fillText(String(countdownValue), canvas.width / 2, canvas.height / 2);
+      } else if (!gameStarted) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Press Start', canvas.width / 2, canvas.height / 2);
+      } else if (world.win) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Offering Accepted!', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Returning to altar...', canvas.width / 2, canvas.height / 2 + 35);
+      } else if (world.lose) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('The ritual failed.', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Press Restart to play again', canvas.width / 2, canvas.height / 2 + 35);
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    function draw() {
+      const now = performance.now();
+      drawBackground();
+      for (const pillar of pillars) drawPillar(pillar, now);
+      drawCenterAltar(now);
+      for (const food of foods) drawFood(food, now);
+      drawSlimeShots(now);
+      drawBursts(now);
+      drawSlug();
+      drawMessage();
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = false;
+      }
+    });
+
+    window.addEventListener('blur', clearKeys);
+
+    startBtn.addEventListener('click', startFirstRun);
+    restartBtn.addEventListener('click', restartAfterFail);
+
+    resetGame(true);
+    loop();
+  </script>
+</body>
+</html>

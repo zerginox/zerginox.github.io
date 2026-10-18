@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Salt Altar — Level 5 | Zerginox</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #060708;
+      color: #d7e0d2;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(95vw, 920px);
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 2rem;
+      letter-spacing: 1px;
+      color: #dbe7d1;
+      text-shadow: 0 0 10px rgba(170, 205, 150, 0.18);
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: #aab4a4;
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: auto;
+      border: 4px solid #171b17;
+      background: #0a0d0a;
+      display: block;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      box-shadow: 0 0 28px rgba(0, 0, 0, 0.65);
+    }
+
+    .ui {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin: 12px 0;
+      flex-wrap: wrap;
+    }
+
+    button {
+      border: 2px solid #2b312b;
+      background: #121612;
+      color: #d7e0d2;
+      padding: 8px 14px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .legend {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      color: #8f998b;
+    }
+  </style>
+<link rel="icon" href="../../assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="portal.css"><script src="portal.js"></script>
+</head>
+<body class="salt-level">
+<header class="portal-nav"><a class="portal-brand" href="../../">Zerginox</a><span class="portal-level">Salt Altar / Ritual 05</span><nav aria-label="Game navigation"><a href="index.html">← Level select</a><a href="../../#games">All games</a></nav></header>
+  <div class="wrap">
+    <h1>Salt Altar</h1>
+    <p>Level 5 — Gather the offerings while the rooted bloom fires orbs and the salt pillars erupt.</p>
+
+    <div class="ui">
+      <div><strong>Food:</strong> <span id="score">0</span> / <span id="total">0</span></div>
+      <div><strong>Lives:</strong> <span id="lives">3</span></div>
+      <div><strong>Time:</strong> <span id="timer">30.0</span>s</div>
+      <div>
+        <button id="startBtn">Start</button>
+        <button id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <canvas id="game" width="900" height="520"></canvas>
+<div class="touch-controls" role="group" aria-label="Touch movement controls"><button type="button" data-key="ArrowLeft" aria-label="Move left">←</button><div class="vertical-controls"><button type="button" data-key="ArrowUp" aria-label="Move up">↑</button><button type="button" data-key="ArrowDown" aria-label="Move down">↓</button></div><button type="button" data-key="ArrowRight" aria-label="Move right">→</button></div>
+
+    <p class="legend">Press Start • Arrow keys / WASD • The rooted bloom slows you with its orbs while the salt pillars erupt</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const totalEl = document.getElementById('total');
+    const livesEl = document.getElementById('lives');
+    const timerEl = document.getElementById('timer');
+    const restartBtn = document.getElementById('restartBtn');
+    const startBtn = document.getElementById('startBtn');
+
+    const keys = {};
+
+    const world = {
+      width: canvas.width,
+      height: canvas.height,
+      score: 0,
+      totalFood: 0,
+      lives: 3,
+      timeLimit: 30,
+      timeLeft: 30,
+      lastTime: 0,
+      win: false,
+      lose: false,
+    };
+
+    const slug = {
+      x: 24,
+      y: 244,
+      w: 56,
+      h: 32,
+      speed: 2.7,
+      facing: 1,
+      wiggle: 0,
+      hurtTimer: 0,
+      freezeTimer: 0,
+      slowTimer: 0,
+      orbHits: 0,
+      orbDecayTimer: 0,
+      orbDecayStepTimer: 0,
+    };
+
+    const bloom = {
+      x: 450,
+      y: 454,
+      sway: 0,
+      shotTimer: 0,
+      shotInterval: 880,
+      shotCount: 0,
+      pulse: 0,
+      eyeFlash: 0,
+      vx: 1.55,
+      minX: 108,
+      maxX: 792,
+    };
+
+    const pillarSystem = {
+      explodeTimer: 0,
+      explodeInterval: 4600,
+      activeBursts: [],
+    };
+
+    const freezeOrbs = [];
+
+    const pillars = [
+      { x: 170, y: 76,  w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 418, y: 74,  w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 686, y: 76,  w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 94,  y: 212, w: 42, h: 74, flash: 0, blastRadius: 64 },
+      { x: 756, y: 212, w: 42, h: 74, flash: 0, blastRadius: 64 },
+      { x: 170, y: 332, w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 418, y: 328, w: 42, h: 64, flash: 0, blastRadius: 64 },
+      { x: 686, y: 332, w: 42, h: 64, flash: 0, blastRadius: 64 },
+    ];
+
+    let foods = [];
+    let gameStarted = false;
+    let countdownActive = false;
+    let countdownValue = 3;
+    let winRedirectStarted = false;
+
+    function clearKeys() {
+      for (const key in keys) delete keys[key];
+    }
+
+    function makeFoods() {
+      foods = [
+        { x: 96,  y: 42,  r: 7, taken: false },
+        { x: 258, y: 112, r: 7, taken: false },
+        { x: 488, y: 88,  r: 7, taken: false },
+        { x: 642, y: 112, r: 7, taken: false },
+        { x: 806, y: 42,  r: 7, taken: false },
+        { x: 86,  y: 304, r: 7, taken: false },
+        { x: 250, y: 262, r: 7, taken: false },
+        { x: 648, y: 262, r: 7, taken: false },
+        { x: 812, y: 304, r: 7, taken: false },
+        { x: 450, y: 414, r: 7, taken: false },
+      ];
+      world.totalFood = foods.length;
+      totalEl.textContent = world.totalFood;
+    }
+
+    function updateUI() {
+      scoreEl.textContent = world.score;
+      livesEl.textContent = world.lives;
+      timerEl.textContent = world.timeLeft.toFixed(1);
+    }
+
+    function clamp(v, min, max) {
+      return Math.max(min, Math.min(max, v));
+    }
+
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function circleRectOverlap(circle, rect) {
+      const closestX = clamp(circle.x, rect.x, rect.x + rect.w);
+      const closestY = clamp(circle.y, rect.y, rect.y + rect.h);
+      const dx = circle.x - closestX;
+      const dy = circle.y - closestY;
+      return (dx * dx + dy * dy) < (circle.r * circle.r);
+    }
+
+    function respawnSlug() {
+      slug.x = 24;
+      slug.y = 244;
+      slug.facing = 1;
+      slug.hurtTimer = 60;
+      slug.freezeTimer = 0;
+      slug.slowTimer = 0;
+      slug.orbHits = 0;
+      slug.orbDecayTimer = 0;
+      slug.orbDecayStepTimer = 0;
+      clearKeys();
+    }
+
+    function resetPillars() {
+      for (const pillar of pillars) {
+        pillar.flash = 0;
+      }
+      pillarSystem.activeBursts = [];
+      pillarSystem.explodeTimer = 0;
+    }
+
+    function resetCoreState() {
+      slug.x = 24;
+      slug.y = 244;
+      slug.facing = 1;
+      slug.wiggle = 0;
+      slug.hurtTimer = 0;
+      slug.freezeTimer = 0;
+      slug.slowTimer = 0;
+      slug.orbHits = 0;
+      slug.orbDecayTimer = 0;
+      slug.orbDecayStepTimer = 0;
+
+      bloom.x = 450;
+      bloom.sway = 0;
+      bloom.shotTimer = 0;
+      bloom.shotCount = 0;
+      bloom.pulse = 0;
+      bloom.eyeFlash = 0;
+      bloom.vx = 1.55;
+
+      freezeOrbs.length = 0;
+      resetPillars();
+
+      world.score = 0;
+      world.lives = 3;
+      world.timeLeft = world.timeLimit;
+      world.lastTime = performance.now();
+      world.win = false;
+      world.lose = false;
+
+      gameStarted = false;
+      countdownActive = false;
+      countdownValue = 3;
+      winRedirectStarted = false;
+
+      clearKeys();
+      makeFoods();
+      updateUI();
+    }
+
+    function resetGame(showStart = true) {
+      resetCoreState();
+      startBtn.disabled = !showStart;
+    }
+
+    function beginWinReturn() {
+      if (winRedirectStarted) return;
+      winRedirectStarted = true;
+      window.SaltAltarHost.advance(6);
+      setTimeout(() => {
+        window.location.href = 'index.html';
+      }, 2000);
+    }
+
+    function beginCountdown() {
+      if (countdownActive || gameStarted) return;
+
+      clearKeys();
+      countdownActive = true;
+      countdownValue = 3;
+      startBtn.disabled = true;
+
+      const countdownInterval = setInterval(() => {
+        countdownValue--;
+        if (countdownValue <= 0) {
+          clearInterval(countdownInterval);
+          countdownActive = false;
+          gameStarted = true;
+          world.lastTime = performance.now();
+        }
+      }, 1000);
+    }
+
+    function startFirstRun() {
+      if (countdownActive || gameStarted) return;
+      clearKeys();
+      beginCountdown();
+    }
+
+    function restartAfterFail() {
+      clearKeys();
+      resetGame(false);
+      beginCountdown();
+    }
+
+    function loseLifeAndRespawn() {
+      world.lives -= 1;
+      updateUI();
+      respawnSlug();
+      if (world.lives <= 0) {
+        world.lose = true;
+        clearKeys();
+      }
+    }
+
+    function fireFreezeOrb(now) {
+      const slugCenterX = slug.x + slug.w / 2;
+      const slugCenterY = slug.y + slug.h / 2;
+      const bloomMouthX = bloom.x + Math.sin(bloom.sway) * 10;
+      const bloomMouthY = bloom.y - 44;
+      const dx = slugCenterX - bloomMouthX;
+      const dy = slugCenterY - bloomMouthY;
+      const dist = Math.hypot(dx, dy) || 1;
+
+      bloom.shotCount += 1;
+      const isRed = bloom.shotCount % 5 === 0;
+      const speed = isRed ? 8.2 : 5.6;
+
+      freezeOrbs.push({
+        x: bloomMouthX,
+        y: bloomMouthY,
+        r: isRed ? 10 : 9,
+        vx: (dx / dist) * speed,
+        vy: (dy / dist) * speed,
+        born: now,
+        life: isRed ? 1800 : 2600,
+        isRed,
+      });
+
+      bloom.eyeFlash = isRed ? 18 : 12;
+    }
+
+    function flashNextPillar() {
+      const available = pillars.filter(p => p.flash <= 0);
+      if (!available.length) return;
+      const pillar = available[Math.floor(Math.random() * available.length)];
+      pillar.flash = 700;
+    }
+
+    function explodeFlashingPillars(dt) {
+      for (const pillar of pillars) {
+        if (pillar.flash <= 0) continue;
+        pillar.flash -= dt * 1000;
+        if (pillar.flash <= 0) {
+          pillar.flash = 0;
+          pillarSystem.activeBursts.push({
+            x: pillar.x + pillar.w / 2,
+            y: pillar.y + pillar.h / 2,
+            radius: pillar.blastRadius,
+            timer: 900,
+          });
+        }
+      }
+    }
+
+    function updateOrbs(now) {
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8,
+      };
+
+      for (let i = freezeOrbs.length - 1; i >= 0; i--) {
+        const orb = freezeOrbs[i];
+        orb.x += orb.vx;
+        orb.y += orb.vy;
+
+        if (
+          orb.x < -20 || orb.x > world.width + 20 ||
+          orb.y < -20 || orb.y > world.height + 20 ||
+          now - orb.born > orb.life
+        ) {
+          freezeOrbs.splice(i, 1);
+          continue;
+        }
+
+        if (slug.hurtTimer <= 0 && circleRectOverlap({ x: orb.x, y: orb.y, r: orb.r }, slugHitbox)) {
+          freezeOrbs.splice(i, 1);
+
+          if (orb.isRed) {
+            loseLifeAndRespawn();
+            break;
+          }
+
+          slug.orbHits += 1;
+          slug.orbDecayTimer = 6000;
+          slug.orbDecayStepTimer = 2000;
+          slug.slowTimer = Math.max(slug.slowTimer, 3000);
+          if (slug.orbHits >= 3) {
+            slug.freezeTimer = 1500;
+            slug.slowTimer = 0;
+            slug.orbHits = 0;
+            slug.orbDecayTimer = 0;
+            slug.orbDecayStepTimer = 0;
+            clearKeys();
+          }
+          break;
+        }
+      }
+    }
+
+    function updateBursts(dt) {
+      const slugHitbox = {
+        x: slug.x + 6,
+        y: slug.y + 6,
+        w: slug.w - 12,
+        h: slug.h - 8,
+      };
+
+      for (let i = pillarSystem.activeBursts.length - 1; i >= 0; i--) {
+        const burst = pillarSystem.activeBursts[i];
+        burst.timer -= dt * 1000;
+
+        if (slug.hurtTimer <= 0 && circleRectOverlap({ x: burst.x, y: burst.y, r: burst.radius }, slugHitbox)) {
+          pillarSystem.activeBursts.splice(i, 1);
+          loseLifeAndRespawn();
+          break;
+        }
+
+        if (burst.timer <= 0) {
+          pillarSystem.activeBursts.splice(i, 1);
+        }
+      }
+    }
+
+    function update() {
+      if (world.win || world.lose) return;
+      if (!gameStarted) return;
+
+      const now = performance.now();
+      const dt = (now - world.lastTime) / 1000;
+      world.lastTime = now;
+
+      world.timeLeft = Math.max(0, world.timeLeft - dt);
+      timerEl.textContent = world.timeLeft.toFixed(1);
+
+      if (world.timeLeft <= 0) {
+        world.lose = true;
+        clearKeys();
+        return;
+      }
+
+      if (slug.orbHits > 0) {
+        slug.orbDecayTimer = Math.max(0, slug.orbDecayTimer - dt * 1000);
+        slug.orbDecayStepTimer = Math.max(0, slug.orbDecayStepTimer - dt * 1000);
+
+        if (slug.orbDecayStepTimer === 0) {
+          slug.orbHits = Math.max(0, slug.orbHits - 1);
+          slug.orbDecayStepTimer = slug.orbHits > 0 ? 2000 : 0;
+        }
+
+        if (slug.orbDecayTimer === 0) {
+          slug.orbHits = 0;
+          slug.orbDecayStepTimer = 0;
+        }
+      }
+
+      let moveSpeed = slug.speed;
+      if (slug.freezeTimer > 0) {
+        slug.freezeTimer = Math.max(0, slug.freezeTimer - dt * 1000);
+        moveSpeed = 0;
+      } else if (slug.slowTimer > 0) {
+        slug.slowTimer = Math.max(0, slug.slowTimer - dt * 1000);
+        moveSpeed = slug.speed * 0.35;
+      }
+
+      let dx = 0;
+      let dy = 0;
+
+      if (keys['arrowleft'] || keys['a']) {
+        dx -= moveSpeed;
+        slug.facing = -1;
+      }
+      if (keys['arrowright'] || keys['d']) {
+        dx += moveSpeed;
+        slug.facing = 1;
+      }
+      if (keys['arrowup'] || keys['w']) dy -= moveSpeed;
+      if (keys['arrowdown'] || keys['s']) dy += moveSpeed;
+
+      const nextX = clamp(slug.x + dx, 0, world.width - slug.w);
+      const nextY = clamp(slug.y + dy, 0, world.height - slug.h);
+      const nextSlug = { x: nextX, y: nextY, w: slug.w, h: slug.h };
+
+      for (const pillar of pillars) {
+        if (slug.hurtTimer <= 0 && rectsOverlap(nextSlug, pillar)) {
+          loseLifeAndRespawn();
+          return;
+        }
+      }
+
+      slug.x = nextX;
+      slug.y = nextY;
+
+      bloom.x += bloom.vx;
+      if (bloom.x <= bloom.minX || bloom.x >= bloom.maxX) {
+        bloom.x = clamp(bloom.x, bloom.minX, bloom.maxX);
+        bloom.vx *= -1;
+      }
+
+      bloom.sway += 0.052;
+      bloom.pulse += 0.12;
+      if (bloom.eyeFlash > 0) bloom.eyeFlash--;
+
+      bloom.shotTimer += dt * 1000;
+      if (bloom.shotTimer >= bloom.shotInterval) {
+        bloom.shotTimer = 0;
+        fireFreezeOrb(now);
+      }
+
+      pillarSystem.explodeTimer += dt * 1000;
+      if (pillarSystem.explodeTimer >= pillarSystem.explodeInterval) {
+        pillarSystem.explodeTimer = 0;
+        flashNextPillar();
+        flashNextPillar();
+      }
+
+      explodeFlashingPillars(dt);
+      updateOrbs(now);
+      updateBursts(dt);
+
+      slug.wiggle += 0.18;
+      if (slug.hurtTimer > 0) slug.hurtTimer--;
+
+      const mouth = {
+        x: slug.x + (slug.facing === 1 ? slug.w * 0.72 : slug.w * 0.28),
+        y: slug.y + slug.h * 0.48,
+        r: 12,
+      };
+
+      const pickupZone = {
+        x: slug.x + 10,
+        y: slug.y + 6,
+        w: slug.w - 8,
+        h: slug.h - 4,
+      };
+
+      for (const food of foods) {
+        if (!food.taken && (
+          circleRectOverlap(food, {
+            x: mouth.x - 13,
+            y: mouth.y - 13,
+            w: 26,
+            h: 26
+          }) ||
+          circleRectOverlap(food, pickupZone)
+        )) {
+          food.taken = true;
+          world.score += 1;
+          updateUI();
+        }
+      }
+
+      if (world.score === world.totalFood) {
+        world.win = true;
+        clearKeys();
+        beginWinReturn();
+      }
+    }
+
+    function drawBackground() {
+      const bg = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      bg.addColorStop(0, '#050605');
+      bg.addColorStop(1, '#111612');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let i = 0; i < 42; i++) {
+        const x = (i * 97) % canvas.width;
+        const y = (i * 61) % canvas.height;
+        ctx.fillStyle = i % 3 === 0 ? 'rgba(180, 220, 170, 0.035)' : 'rgba(255,255,255,0.02)';
+        ctx.beginPath();
+        ctx.arc(x, y, 1 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.strokeStyle = 'rgba(70, 95, 70, 0.18)';
+      ctx.lineWidth = 2;
+      for (let x = 80; x < canvas.width; x += 170) {
+        ctx.beginPath();
+        ctx.moveTo(x, canvas.height);
+        ctx.quadraticCurveTo(x - 18, canvas.height - 100, x + 12, canvas.height - 190);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#151914';
+      ctx.fillRect(0, 468, canvas.width, 52);
+    }
+
+    function drawFood(food, now) {
+      if (food.taken) return;
+      const pulse = 1 + Math.sin(now / 180 + food.x * 0.01) * 0.12;
+      ctx.save();
+      ctx.translate(food.x, food.y);
+      ctx.scale(pulse, pulse);
+      ctx.fillStyle = '#f7fff5';
+      ctx.beginPath();
+      ctx.arc(0, 0, food.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(-2, -2, food.r * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    function drawPillar(pillar, now) {
+      const x = pillar.x;
+      const y = pillar.y;
+      const w = pillar.w;
+      const h = pillar.h;
+
+      const glow = ctx.createRadialGradient(
+        x + w / 2, y + h / 2, 6,
+        x + w / 2, y + h / 2, Math.max(w, h) * 0.9
+      );
+      glow.addColorStop(0, 'rgba(200,245,230,0.10)');
+      glow.addColorStop(1, 'rgba(200,245,230,0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - 16, y - 16, w + 32, h + 32);
+
+      ctx.fillStyle = 'rgba(15,18,15,0.45)';
+      ctx.beginPath();
+      ctx.ellipse(x + w * 0.48, y + h + 8, w * 0.50, 8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const flashOn = pillar.flash > 0 && Math.floor(now / 90) % 2 === 0;
+      const base = flashOn ? 'rgba(255,240,240,0.96)' : 'rgba(235,255,248,0.88)';
+      const tint = flashOn ? 'rgba(255,120,120,0.55)' : 'rgba(175,225,210,0.55)';
+
+      const shards = [
+        { cx: x + w * 0.24, cy: y + h * 0.64, sw: w * 0.54, sh: h * 0.76 },
+        { cx: x + w * 0.54, cy: y + h * 0.50, sw: w * 0.62, sh: h * 1.00 },
+        { cx: x + w * 0.78, cy: y + h * 0.64, sw: w * 0.42, sh: h * 0.70 }
+      ];
+
+      for (const shard of shards) {
+        const sx = shard.cx;
+        const sy = shard.cy;
+        const sw = shard.sw;
+        const sh = shard.sh;
+
+        const poly = [
+          { x: sx - sw * 0.45, y: sy + sh * 0.25 },
+          { x: sx - sw * 0.10, y: sy - sh * 0.48 },
+          { x: sx + sw * 0.22, y: sy - sh * 0.42 },
+          { x: sx + sw * 0.42, y: sy - sh * 0.05 },
+          { x: sx + sw * 0.30, y: sy + sh * 0.50 },
+          { x: sx - sw * 0.20, y: sy + sh * 0.56 }
+        ];
+
+        ctx.fillStyle = base;
+        ctx.strokeStyle = '#0f1912';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = tint;
+        ctx.beginPath();
+        ctx.moveTo(poly[1].x, poly[1].y);
+        ctx.lineTo(poly[2].x, poly[2].y);
+        ctx.lineTo(poly[3].x, poly[3].y);
+        ctx.lineTo(sx + sw * 0.05, sy + sh * 0.12);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    function drawBursts(now) {
+      for (const burst of pillarSystem.activeBursts) {
+        const pulse = 0.78 + Math.sin(now / 35) * 0.12;
+        ctx.save();
+        ctx.globalAlpha = 0.34;
+        ctx.fillStyle = '#9fe7ff';
+        ctx.beginPath();
+        ctx.arc(burst.x, burst.y, burst.radius * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 0.85;
+        ctx.strokeStyle = '#d8fbff';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(burst.x, burst.y, burst.radius * (0.76 + Math.sin(now / 50) * 0.06), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    function drawFreezeOrbs(now) {
+      for (const orb of freezeOrbs) {
+        ctx.save();
+        ctx.translate(orb.x, orb.y);
+        ctx.rotate(now / 220 + orb.x * 0.01);
+
+        ctx.fillStyle = orb.isRed ? '#a30f18' : '#cfe8f0';
+        ctx.beginPath();
+        ctx.moveTo(0, -orb.r - 2);
+        ctx.lineTo(orb.r * 0.78, -orb.r * 0.18);
+        ctx.lineTo(orb.r + 2, orb.r * 0.18);
+        ctx.lineTo(orb.r * 0.46, orb.r + 3);
+        ctx.lineTo(-orb.r * 0.14, orb.r * 0.72);
+        ctx.lineTo(-orb.r - 2, orb.r * 0.18);
+        ctx.lineTo(-orb.r * 0.68, -orb.r * 0.34);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = orb.isRed ? '#2a0608' : '#182127';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.fillStyle = orb.isRed ? 'rgba(255, 125, 125, 0.42)' : 'rgba(165, 220, 232, 0.55)';
+        ctx.beginPath();
+        ctx.arc(-2, -2, orb.r * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    function drawBloom(now) {
+      const swayX = Math.sin(bloom.sway) * 9;
+      const headBob = Math.sin(now / 240 + bloom.pulse) * 1.8;
+      const jawPulse = Math.sin(now / 150 + bloom.pulse) * 2.2;
+
+      ctx.save();
+      ctx.translate(bloom.x + swayX, bloom.y);
+
+      ctx.strokeStyle = '#1c2315';
+      ctx.lineWidth = 10;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-6, -30, -2, -78);
+      ctx.stroke();
+
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(-1, -14);
+      ctx.quadraticCurveTo(-16, -28, -22, -56);
+      ctx.moveTo(2, -26);
+      ctx.quadraticCurveTo(18, -40, 25, -66);
+      ctx.moveTo(0, -42);
+      ctx.quadraticCurveTo(-10, -58, -12, -86);
+      ctx.stroke();
+
+      ctx.fillStyle = '#2b3720';
+      ctx.beginPath();
+      ctx.ellipse(-15, -34, 14, 7, -0.7, 0, Math.PI * 2);
+      ctx.ellipse(16, -42, 15, 7, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      const thorns = [
+        { x: -28, y: -90, rot: -1.05, len: 22, width: 9 },
+        { x: -13, y: -103, rot: -0.45, len: 26, width: 10 },
+        { x: 0, y: -107, rot: 0, len: 28, width: 10 },
+        { x: 13, y: -103, rot: 0.45, len: 26, width: 10 },
+        { x: 28, y: -90, rot: 1.05, len: 22, width: 9 },
+        { x: -30, y: -76, rot: -1.35, len: 18, width: 8 },
+        { x: 30, y: -76, rot: 1.35, len: 18, width: 8 }
+      ];
+
+      for (let i = 0; i < thorns.length; i++) {
+        const t = thorns[i];
+        ctx.save();
+        ctx.translate(t.x, t.y + Math.sin(now / 520 + i * 0.45) * 1.1);
+        ctx.rotate(t.rot);
+        ctx.fillStyle = i % 2 === 0 ? '#8f9a90' : '#a7b0a5';
+        ctx.strokeStyle = '#131814';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -t.len);
+        ctx.lineTo(t.width, -3);
+        ctx.lineTo(4, 8);
+        ctx.lineTo(0, 14);
+        ctx.lineTo(-4, 8);
+        ctx.lineTo(-t.width, -3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.fillStyle = '#1c0b0f';
+      ctx.strokeStyle = '#080405';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-24, -92 + headBob);
+      ctx.lineTo(-12, -108 + headBob);
+      ctx.lineTo(12, -108 + headBob);
+      ctx.lineTo(24, -92 + headBob);
+      ctx.lineTo(22, -68 + headBob);
+      ctx.lineTo(0, -54 + headBob);
+      ctx.lineTo(-22, -68 + headBob);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#0f0508';
+      ctx.beginPath();
+      ctx.moveTo(-14, -88 + headBob);
+      ctx.lineTo(-7, -98 + headBob);
+      ctx.lineTo(7, -98 + headBob);
+      ctx.lineTo(14, -88 + headBob);
+      ctx.lineTo(14, -74 + headBob);
+      ctx.lineTo(0, -63 + headBob);
+      ctx.lineTo(-14, -74 + headBob);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = bloom.eyeFlash > 0 ? '#eefcff' : '#ece8df';
+      ctx.beginPath();
+      ctx.ellipse(0, -81 + headBob, 12, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#0d0908';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.fillStyle = '#0c0708';
+      ctx.beginPath();
+      ctx.ellipse(0, -81 + headBob, 4.2, 5.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.arc(-1.4, -83 + headBob, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#050304';
+      ctx.beginPath();
+      ctx.moveTo(-10, -64 + headBob + jawPulse);
+      ctx.quadraticCurveTo(0, -57 + headBob + jawPulse, 10, -64 + headBob + jawPulse);
+      ctx.quadraticCurveTo(0, -69 + headBob + jawPulse, -10, -64 + headBob + jawPulse);
+      ctx.fill();
+
+      ctx.strokeStyle = '#d7d8d2';
+      ctx.lineWidth = 1.2;
+      for (let i = -2; i <= 2; i++) {
+        if (i === 0) continue;
+        const tx = i * 4.2;
+        ctx.beginPath();
+        ctx.moveTo(tx, -64 + headBob + jawPulse);
+        ctx.lineTo(tx * 0.8, -59 + headBob + jawPulse);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    }
+
+    function drawSlugBody(baseA, baseB, hurtFlash) {
+      const bodyGrad = ctx.createLinearGradient(0, 0, slug.w, slug.h);
+      bodyGrad.addColorStop(0, hurtFlash ? '#6f7b58' : baseA);
+      bodyGrad.addColorStop(1, hurtFlash ? '#303926' : baseB);
+      ctx.fillStyle = bodyGrad;
+
+      ctx.beginPath();
+      ctx.moveTo(5, slug.h - 1);
+      ctx.quadraticCurveTo(10, 4, 28, 5);
+      ctx.quadraticCurveTo(44, 5, 55, 16);
+      ctx.quadraticCurveTo(61, 22, 56, 28);
+      ctx.quadraticCurveTo(51, 31, 36, 30);
+      ctx.lineTo(10, 30);
+      ctx.quadraticCurveTo(2, 29, 5, slug.h - 1);
+      ctx.fill();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      ctx.strokeStyle = '#0a0d08';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(16, 11);
+      ctx.lineTo(15, -5);
+      ctx.moveTo(28, 10);
+      ctx.lineTo(31, -7);
+      ctx.stroke();
+
+      ctx.fillStyle = '#e9f7df';
+      ctx.beginPath();
+      ctx.arc(15, -5, 3.5, 0, Math.PI * 2);
+      ctx.arc(31, -7, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#0a0d08';
+      ctx.beginPath();
+      ctx.arc(15, -5, 1.8, 0, Math.PI * 2);
+      ctx.arc(31, -7, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(20, 15, 1.7, 0, Math.PI * 2);
+      ctx.arc(31, 14, 1.7, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#10150c';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(37, 19);
+      ctx.quadraticCurveTo(44, 22, 37, 25);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#a9c56d';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(12, 24);
+      ctx.quadraticCurveTo(18, 20, 24, 24);
+      ctx.quadraticCurveTo(30, 28, 36, 24);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(210, 255, 210, 0.08)';
+      ctx.beginPath();
+      ctx.ellipse(22, 12, 10, 4, -0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawDefaultSlug() {
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+      drawSlugBody('#6e7f56', '#2b3323', isHurtFlash);
+
+    }
+
+    function drawSlug() {
+      const bob = Math.sin(slug.wiggle) * 2;
+      const isHurtFlash = slug.hurtTimer > 0 && Math.floor(slug.hurtTimer / 5) % 2 === 0;
+
+      ctx.save();
+      ctx.translate(slug.x + slug.w / 2, slug.y + slug.h / 2 + bob);
+      if (slug.facing === -1) ctx.scale(-1, 1);
+      ctx.translate(-slug.w / 2, -slug.h / 2);
+      if (isHurtFlash) ctx.globalAlpha = 0.65;
+      drawDefaultSlug();
+      ctx.restore();
+    }
+
+    function drawStatusText() {
+    }
+
+    function drawMessage() {
+      if (!world.win && !world.lose && !countdownActive && gameStarted) return;
+
+      ctx.fillStyle = 'rgba(0,0,0,0.45)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = 'white';
+      ctx.textAlign = 'center';
+
+      if (countdownActive) {
+        ctx.font = 'bold 80px Arial';
+        ctx.fillText(String(countdownValue), canvas.width / 2, canvas.height / 2);
+      } else if (!gameStarted) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Press Start', canvas.width / 2, canvas.height / 2);
+      } else if (world.win) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('Offering Accepted!', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Returning to altar...', canvas.width / 2, canvas.height / 2 + 35);
+      } else if (world.lose) {
+        ctx.font = 'bold 42px Arial';
+        ctx.fillText('The ritual failed.', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.font = '24px Arial';
+        ctx.fillText('Press Restart to play again', canvas.width / 2, canvas.height / 2 + 35);
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    function draw() {
+      const now = performance.now();
+      drawBackground();
+      for (const pillar of pillars) drawPillar(pillar, now);
+      drawBursts(now);
+      for (const food of foods) drawFood(food, now);
+      drawFreezeOrbs(now);
+      drawBloom(now);
+      drawSlug();
+      drawStatusText();
+      drawMessage();
+    }
+
+    function loop() {
+      update();
+      draw();
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = true;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const key = e.key.toLowerCase();
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'w', 'a', 's', 'd'].includes(key)) {
+        e.preventDefault();
+        keys[key] = false;
+      }
+    });
+
+    window.addEventListener('blur', clearKeys);
+
+    startBtn.addEventListener('click', startFirstRun);
+    restartBtn.addEventListener('click', restartAfterFail);
+
+    resetGame(true);
+    loop();
+  </script>
+</body>
+</html>
