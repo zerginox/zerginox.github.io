@@ -4,7 +4,7 @@ The static website at **https://www.zerginox.com/**, with the restored Salt Alta
 
 ## Pages
 
-- `/` — The redesigned Zerginox homepage, procedural wizard, games, about, and contact.
+- `/` — The simplified Zerginox homepage: logo, “A little weird. By design.”, procedural wizard, and game links.
 - `/games/salt-altar/` — Salt Altar level select, six playable levels, original music, and saved progression. Levels 7–13 remain marked as future content; they are not implemented in the supplied game.
 - `/games/monster-fish/` — Monster Fish project page, playable embedded prototype, and Android download.
 - `/games/monster-fish/play/` — Full-screen Monster Fish browser prototype.

@@ -3,16 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Step into the strange little world of Zerginox. Original games, curious creatures, and web design with a darker edge. Play Salt Altar and explore Monster Fish.">
+  <meta name="description" content="Salt Altar and Monster Fish. Games by Zerginox.">
   <meta name="theme-color" content="#0b100e">
-  <meta property="og:title" content="Zerginox — Strange little worlds">
-  <meta property="og:description" content="Games, websites, and a few things lurking in the dark. Enter Salt Altar. Explore Monster Fish.">
+  <meta property="og:title" content="Zerginox">
+  <meta property="og:description" content="Play Salt Altar and Monster Fish.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.zerginox.com/">
-  <title>Zerginox — Strange little worlds</title>
+  <title>Zerginox</title>
   <link rel="icon" href="assets/favicon.svg?v=20261018" type="image/svg+xml">
   <link rel="preload" href="assets/fonts/Creepster-Regular.ttf" as="font" type="font/ttf" crossorigin>
-  <link rel="stylesheet" href="style.css?v=20261018">
+  <link rel="stylesheet" href="style.css?v=20261018-clean">
   <script src="games/monster-fish/play/catalog/rarities.js" defer></script>
   <script src="games/monster-fish/play/catalog/lake-events.js" defer></script>
   <script src="games/monster-fish/play/catalog/bait.js" defer></script>
@@ -27,44 +27,38 @@
   <div class="site-shell">
     <header class="site-header">
       <a href="./" class="brand" aria-label="Zerginox home">Zerginox<span class="brand-star" aria-hidden="true">✦</span></a>
-      <nav aria-label="Main navigation"><a href="#games">The games</a><a href="#about">The maker</a><a class="nav-contact" href="mailto:zerginox@gmail.com">Get in touch <span aria-hidden="true">↗</span></a></nav>
+      <nav aria-label="Main navigation"><a href="#games">Games</a><a class="nav-contact" href="mailto:zerginox@gmail.com">Contact <span aria-hidden="true">↗</span></a></nav>
     </header>
     <main id="main">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> INDEPENDENT GAMES &amp; DIGITAL WORK</p>
+
           <h1 id="hero-title" class="hero-wordmark">Zerginox</h1>
           <p class="hero-statement">A little weird.<br><em>By design.</em></p>
-          <p class="intro">I make games and websites with a darker edge, a little personality, and something worth exploring.</p>
-          <div class="hero-actions"><a class="button button-primary" href="#games">Explore the games <span aria-hidden="true">↓</span></a><a class="text-link" href="mailto:zerginox@gmail.com">Let’s make something <span aria-hidden="true">↗</span></a></div>
-          <div class="hero-footnote"><span class="tiny-cross" aria-hidden="true">✣</span> MADE WITH CURIOSITY. AND PROBABLY TOO MUCH COFFEE.</div>
+
+          <div class="hero-actions"><a class="button button-primary" href="#games">Explore the games <span aria-hidden="true">↓</span></a></div>
+
         </div>
         <div class="wizard-stage">
           <canvas id="wizard" width="690" height="640" role="img" aria-label="An original crooked-hatted wizard with moss for a beard, mismatched eyes, a toothy grin, and a glowing eye on his staff."></canvas>
-          <div class="wizard-caption"><span class="caption-rule" aria-hidden="true"></span><span>DON’T MIND THE WIZARD.</span><span class="caption-index">FIG. 01</span></div>
+
         </div>
       </section>
       <section class="games-section" id="games" aria-labelledby="games-title">
-        <div class="section-heading"><div><p class="eyebrow">SOMETHING TO GET LOST IN</p><h2 id="games-title">Enter another world<span>.</span></h2></div><span class="section-aside">TWO GAMES. PLENTY OF STRANGE COMPANY.</span></div>
+        <div class="section-heading"><h2 id="games-title">Games</h2></div>
         <div class="game-grid">
           <article class="game-card salt-card">
-            <a href="games/salt-altar/" class="game-art salt-art" tabindex="-1" aria-hidden="true"><span class="art-index">01 / THE OFFERING</span><img src="games/salt-altar/logo.png" alt="" width="1536" height="1024" loading="lazy"><span class="art-corner" aria-hidden="true">↗</span></a>
-            <div class="game-copy"><div class="game-kicker"><span class="status-dot"></span> PLAY IN YOUR BROWSER</div><h3>Salt Altar</h3><p>A small slug. A very unfriendly world. Gather the offerings, avoid the salt, and finish the ritual before time runs out.</p><div class="game-meta"><span>6 playable levels</span><span>Keyboard + touch</span></div><a class="game-link" href="games/salt-altar/">Enter Salt Altar <span aria-hidden="true">↗</span></a></div>
+            <a href="games/salt-altar/" class="game-art salt-art" tabindex="-1" aria-hidden="true"><img src="games/salt-altar/logo.png" alt="" width="1536" height="1024" loading="lazy"><span class="art-corner" aria-hidden="true">↗</span></a>
+            <div class="game-copy"><div class="game-kicker"><span class="status-dot"></span> BROWSER GAME</div><h3>Salt Altar</h3><div class="game-meta"><span>6 playable levels</span><span>Keyboard + touch</span></div><a class="game-link" href="games/salt-altar/">Play Salt Altar <span aria-hidden="true">↗</span></a></div>
           </article>
           <article class="game-card fish-card">
-            <a href="games/monster-fish/" class="game-art fish-art" tabindex="-1" aria-hidden="true"><span class="art-index">02 / BENEATH THE SURFACE</span><canvas id="fish-preview" width="700" height="440"></canvas><span class="art-corner" aria-hidden="true">↗</span><span class="lake-whisper">SOMETHING IS DOWN THERE.</span></a>
-            <div class="game-copy"><div class="game-kicker prototype"><span class="status-dot"></span> IN DEVELOPMENT · FIRST PLAYABLE</div><h3>Monster Fish</h3><p>Cast a line into Blackwater Lake. Match the bait, watch the clock, and see what bites when the water gets strange.</p><div class="game-meta"><span>25 creatures to find</span><span>Real-time encounters</span></div><a class="game-link" href="games/monster-fish/">Explore Monster Fish <span aria-hidden="true">↗</span></a></div>
+            <a href="games/monster-fish/" class="game-art fish-art" tabindex="-1" aria-hidden="true"><canvas id="fish-preview" width="700" height="440"></canvas><span class="art-corner" aria-hidden="true">↗</span></a>
+            <div class="game-copy"><div class="game-kicker prototype"><span class="status-dot"></span> IN DEVELOPMENT</div><h3>Monster Fish</h3><div class="game-meta"><span>25 creatures to find</span><span>Real-time encounters</span></div><a class="game-link" href="games/monster-fish/">Play Monster Fish <span aria-hidden="true">↗</span></a></div>
           </article>
         </div>
       </section>
-      <section class="about-section" id="about" aria-labelledby="about-title">
-        <div class="about-mark" aria-hidden="true"><span>✣</span><i></i><small>THE PERSON<br>BEHIND THE WEIRD</small></div>
-        <div class="about-heading"><p class="eyebrow">THE MAKER</p><h2 id="about-title">Hi, I’m Zerginox.<br><em>I like making things.</em></h2></div>
-        <div class="about-copy"><p>Games, heavy music, and dark fantasy shape the things I build. I’m drawn to work with atmosphere, character, and a few rough edges—the kind of small detail that makes you stop and look again.</p><p>My background is in IT management, and I’m pursuing an MSCS through Penn State. I work with HTML, CSS, JavaScript, Python, Kotlin, and Java, bringing ideas to life one project at a time.</p><p class="availability"><span class="status-dot"></span> I’m accepting select web design and development projects at no cost while I build my portfolio.</p><a class="text-link" href="mailto:zerginox@gmail.com">Have something in mind? <span aria-hidden="true">↗</span></a></div>
-      </section>
-      <section class="contact-section" aria-labelledby="contact-title"><p class="eyebrow">GOT AN IDEA THAT WON’T LEAVE YOU ALONE?</p><div><h2 id="contact-title">Let’s make it real.</h2><a href="mailto:zerginox@gmail.com" class="contact-circle" aria-label="Email Zerginox"><span aria-hidden="true">↗</span></a></div><a class="contact-email" href="mailto:zerginox@gmail.com">zerginox@gmail.com</a></section>
     </main>
-    <footer class="site-footer"><a class="brand footer-brand" href="./">Zerginox</a><span>STRANGE LITTLE WORLDS. MADE ONE AT A TIME.</span><a href="https://github.com/zerginox" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></footer>
+    <footer class="site-footer"><a class="brand footer-brand" href="./">Zerginox</a><a href="https://github.com/zerginox" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></footer>
   </div>
 </body>
 </html>
