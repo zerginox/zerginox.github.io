@@ -113,6 +113,9 @@
     const startBtn = document.getElementById('startBtn');
 
     const keys = {};
+    const levelMusic = new Audio('Level_2.mp3');
+    levelMusic.loop = true;
+    levelMusic.preload = 'auto';
 
     const world = {
       width: canvas.width,
@@ -296,6 +299,8 @@
     }
 
     function resetCoreState() {
+      levelMusic.pause();
+      levelMusic.currentTime = 0;
       slug.x = 25;
       slug.y = 245;
       slug.facing = -1;
@@ -330,6 +335,8 @@
     function beginWinReturn() {
       if (winRedirectStarted) return;
       winRedirectStarted = true;
+      levelMusic.pause();
+      levelMusic.currentTime = 0;
 
       window.SaltAltarHost.advance(3);
 
@@ -361,12 +368,16 @@
     function startFirstRun() {
       if (countdownActive || gameStarted) return;
       clearKeys();
+      levelMusic.currentTime = 0;
+      levelMusic.play().catch(() => {});
       beginCountdown();
     }
 
     function restartAfterFail() {
       clearKeys();
       resetGame(false);
+      levelMusic.currentTime = 0;
+      levelMusic.play().catch(() => {});
       beginCountdown();
     }
 
@@ -407,6 +418,8 @@
       if (world.lives <= 0) {
         world.lose = true;
         clearKeys();
+        levelMusic.pause();
+        levelMusic.currentTime = 0;
       }
     }
 
@@ -433,6 +446,8 @@
       if (world.timeLeft <= 0) {
         world.lose = true;
         clearKeys();
+        levelMusic.pause();
+        levelMusic.currentTime = 0;
         return;
       }
 
@@ -472,6 +487,8 @@
         if (world.lives <= 0) {
           world.lose = true;
           clearKeys();
+          levelMusic.pause();
+          levelMusic.currentTime = 0;
         }
       }
 
